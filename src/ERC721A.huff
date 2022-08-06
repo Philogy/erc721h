@@ -5,6 +5,7 @@
 
 /* Imports */
 #include "./utils/HashMap.huff"
+#include "./utils/Misc.huff"
 
 /* ERC721 Interface */
 
@@ -23,8 +24,8 @@
 #define function safeTransferFrom(address, address, uint256) nonpayable returns ()
 #define function safeTransferFrom(address, address, uint256, bytes) nonpayable returns ()
 // added sigs as constants to avoid having to use __FUNC_SIG("...")
-#define constant NO_DATA_SAFE_TRANSFER_FROM_SIG = 0x42842e0e
-#define constant DATA_SAFE_TRANSFER_FROM_SIG = 0xb88d4fde
+#define constant SIG_NO_DATA_SAFE_TRANSFER_FROM = 0x42842e0e
+#define constant SIG_DATA_SAFE_TRANSFER_FROM = 0xb88d4fde
 
 /* ERC721 Interface -- Allowance */
 #define function getApproved(uint256) view returns (address)
@@ -35,6 +36,9 @@
 /* ERC721 Interface -- Ownership */
 #define function ownerOf(uint256) view returns (address)
 #define function balanceOf(address) view returns (uint256)
+
+/* ERC721 Interface -- Receiver */
+#define function onERC721Received(address, address, uint256, bytes) nonpayable returns (bytes4)
 
 /* ERC165 */
 #define function supportsInterface(bytes4) view returns (bool)
@@ -52,22 +56,73 @@
   [START_TOKEN_ID] [SLOT_GLOBAL_INDICES] sstore // _currentIndex = START_TOKEN_ID
 }
 
-#define macro ERC721H_SELECTOR_SWITCH(name, symbol, tokenURI, supportsInterface) = takes(1) returns(1) {
-  // takes: [selector]
-  dup1 __FUNC_SIG(setApprovalForAll)    eq __ERC721H__setApprovalForAll      jumpi
-  dup1 [NO_DATA_SAFE_TRANSFER_FROM_SIG] eq __ERC721H__noDataSafeTransferFrom jumpi
-  dup1 __FUNC_SIG(transferFrom)         eq __ERC721H__transferFrom           jumpi
-  dup1 [DATA_SAFE_TRANSFER_FROM_SIG]    eq __ERC721H__dataSafeTransferFrom   jumpi
+#define jumptable __ERC721H__SELECTOR_TABLE {
+  __ERC721H__balanceOf
+  __ERC721H__selectorSwitchEnd
+  __ERC721H__supportsInterface
+  __ERC721H__dataSafeTransferFrom
+  __ERC721H__getApproved
+  __ERC721H__tokenURI
+  __ERC721H__symbol
+  __ERC721H__name
+  __ERC721H__ownerOf
+  __ERC721H__approve
+  __ERC721H__isApprovedForAll
+  __ERC721H__noDataSafeTransferFrom
+  __ERC721H__transferFrom
+  __ERC721H__setApprovalForAll
+  __ERC721H__selectorSwitchEnd
+  __ERC721H__selectorSwitchEnd
+}
 
-  __ERC721H__selectorSwitchEnd jump
+// TODO: Future args name, symbol, tokenURI, supportsInterface
+#define macro ERC721H_SELECTOR_SWITCH() = takes(1) returns(1) {
+  // takes:         [selector]
+  0x20           // [0x20, selector]
+  // needs to be multiplied by 32 (<< 5) for table offset
+  // thus 10 (total offset) - 5
+  dup2 0x5 shr   // [selector >> 5, 0x20 selector]
+  // 4-bit mask shift left 5 to meet selector
+  0x1e0 and      // [table_offset, 0x20, selector]
+  __tablestart(__ERC721H__SELECTOR_TABLE) add
+  //                [code_offset, 0x20, selector]
+  returndatasize // [0x0, code_offset, 0x20, selector]
+  codecopy       // [selector]
+  returndatasize // [0x0, selector]
+  mload jump     // [selector]
 
-  __ERC721H__setApprovalForAll:
-  __ERC721H__noDataSafeTransferFrom:
-  __ERC721H__transferFrom:
+  __ERC721H__balanceOf:
+    dup1 __FUNC_SIG(balanceOf) eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__supportsInterface:
+    dup1 __FUNC_SIG(supportsInterface) eq iszero __ERC721H__selectorSwitchEnd jumpi
   __ERC721H__dataSafeTransferFrom:
+    dup1 [SIG_DATA_SAFE_TRANSFER_FROM] eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__getApproved:
+    dup1 __FUNC_SIG(getApproved) eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__tokenURI:
+    dup1 __FUNC_SIG(tokenURI) eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__symbol:
+    dup1 __FUNC_SIG(symbol) eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__name:
+    dup1 __FUNC_SIG(name) eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__ownerOf:
+    dup1 __FUNC_SIG(ownerOf) eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__approve:
+    dup1 __FUNC_SIG(approve) eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__isApprovedForAll:
+    dup1 __FUNC_SIG(isApprovedForAll) eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__noDataSafeTransferFrom:
+    dup1 [SIG_NO_DATA_SAFE_TRANSFER_FROM] eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__transferFrom:
+    dup1 __FUNC_SIG(transferFrom) eq iszero __ERC721H__selectorSwitchEnd jumpi
+  __ERC721H__setApprovalForAll:
+    dup1 __FUNC_SIG(setApprovalForAll) eq iszero __ERC721H__selectorSwitchEnd jumpi
 
   __ERC721H__selectorSwitchEnd:
 }
 
 // TODO: Remove, only to appease compiler
-#define macro MAIN() = takes(0) returns(0) { }
+#define macro MAIN() = takes(0) returns(0) {
+  GET_SELECTOR()
+  ERC721H_SELECTOR_SWITCH()
+}

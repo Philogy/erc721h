@@ -1,0 +1,76 @@
+#define error Panic(uint256)
+
+
+/* the remaining error sig is explicitly not popped, can be useful if chaining
+ * multiple conditions into an AND-type conditional statement
+ *
+ * solidity: if (!(cond1 && cond2 && cond3)) revert MyCustomError()
+ * huff, where cond<x> is an op that places condition at the top of stack:
+ * __FUNC_SIG(MyCustomError)
+ * cond1 REQUIRE(0x0)
+ * cond2 REQUIRE(0x0)
+ * cond3 REQUIRE(0x0)
+ */
+#define macro REQUIRE(zero) = takes (2) returns (1) {
+  // takes:                       [condition, error_sig]
+  utils_require_continue jumpi // [error_sig]
+  <zero> mstore                // []
+  0x04 0x1c revert
+  utils_require_continue:      // [error_sig]
+}
+
+/// @dev underflow safe subtraction with custom error (4-byte error sig only, no args)
+#define macro SAFE_SUB(zero) = takes(3) returns(1) {
+  // takes:          [error_sig, x, y]
+  dup3 dup3       // [x, y, error_sig, x, y]
+  lt iszero       // [x >= y, error_sig, x, y]
+  REQUIRE(<zero>) // [error_sig, x, y]
+  pop sub         // [x-y]
+}
+
+/// @dev underflow safe subtraction which throws same error as solidity
+#define macro SAFE_SUB_PANIC(zero) = takes(2) returns(1) {
+  // takes:    [x, y]
+  dup2 dup2 // [x, y, x, y]
+  lt iszero // [x >= y, x, y]
+  continue_safe_sub jumpi
+  0x11 PANIC(<zero>)
+  continue_safe_sub:
+    sub     // [x - y]
+}
+
+#define macro SAFE_ADD_PANIC(zero) = takes(2) returns(1) {
+  // takes: [x, y]
+  dup2       // [y, x, y]
+  add        // [y + x, y]
+  swap1 dup2 // [y + x, y, y + x]
+  lt iszero  // [y + x >= y, y + x]
+  continue_safe_add jumpi
+  0x11 PANIC(<zero>)
+  continue_safe_add:
+  //            [y + x]
+}
+
+#define macro NO_VALUE_CHECK(zero) = takes(0) returns(0) {
+  callvalue iszero continue_after_value_check jumpi
+  <zero> <zero> revert
+  continue_after_value_check:
+}
+
+#define macro RETURN1(zero) = takes(1) returns(0) {
+  // takes:        [value_to_return]
+  <zero> mstore // []
+  0x20 <zero> return
+}
+
+// Must be at the beginning of a contract to ensure RETURNDATASIZE is zero
+#define macro GET_SELECTOR() = takes(0) returns(0) {
+  returndatasize calldataload 0xE0 shr
+}
+
+#define macro PANIC(zero) = takes(1) returns(0) {
+  // takes: [panic_code]
+  __FUNC_SIG(Panic) <zero> mstore
+  0x20 mstore
+  0x24 0x1c revert
+}
