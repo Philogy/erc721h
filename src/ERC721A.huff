@@ -59,7 +59,7 @@
 // only 13 methods but 16 possible bit sequences, gaps filled with continue label
 #define jumptable __ERC721H__SELECTOR_TABLE {
   __ERC721H__balanceOf
-  __ERC721H__selectorSwitchEnd
+  __ERC721H__selectorSwitchEnd // gap
   __ERC721H__supportsInterface
   __ERC721H__dataSafeTransferFrom
   __ERC721H__getApproved
@@ -72,8 +72,8 @@
   __ERC721H__noDataSafeTransferFrom
   __ERC721H__transferFrom
   __ERC721H__setApprovalForAll
-  __ERC721H__selectorSwitchEnd
-  __ERC721H__selectorSwitchEnd
+  __ERC721H__selectorSwitchEnd // gap
+  __ERC721H__selectorSwitchEnd // gap
 }
 
 /**
@@ -85,7 +85,7 @@
   // takes:         [selector]
   0x20           // [0x20, selector]
   // needs to be multiplied by 32 (<< 5) for table offset
-  // thus 10 (total offset) - 5 = 5
+  // >> 10; << 5; simplifies to >> 5
   dup2 0x5 shr   // [selector >> 5, 0x20 selector]
   // 4-bit mask shift left 5 to meet selector
   0x1e0 and      // [table_offset, 0x20, selector]
