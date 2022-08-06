@@ -7,6 +7,12 @@
 #include "./utils/HashMap.huff"
 
 /* ERC721 Interface */
+
+/* ERC721 Interface -- Events */
+#define event Transfer(address, address, uint256)
+#define event Approval(address, address, uint256)
+#define event ApprovalForAll(address, address, bool)
+
 /* ERC721 Interface -- Metadata */
 #define function name() nonpayable returns (string)
 #define function symbol() nonpayable returns (string)
@@ -28,9 +34,7 @@
 #define function ownerOf(uint256) view returns (address)
 #define function balanceOf(address) view returns (uint256)
 
-/* ERC721 Interface -- Events */
-#define event Transfer(address, address, uint256)
-#define event Approval(address, address, uint256)
-#define event ApprovalForAll(address, address, bool)
+/* ERC165 */
+#define function supportsInterface(bytes4) view returns (bool)
 
 /* Storage Slots */
