@@ -1,0 +1,32 @@
+/// @title ERC721A
+/// @author Huff Language <https://github.com/huff-language>
+/// @notice An exemplary ERC721A token contract written in Huff.
+
+/* Imports */
+#include "./utils/HashMap.huff"
+#include "./utils/Ownable.huff"
+
+/* Interface */
+#define function mint(address,uint256) nonpayable returns ()
+
+#define function name() nonpayable returns (string)
+#define function symbol() nonpayable returns (string)
+#define function tokenURI(uint256) nonpayable returns (string)
+
+#define function mint(address,uint256) nonpayable returns ()
+#define function transfer(address,uint256) nonpayable returns ()
+#define function transferFrom(address,address,uint256) nonpayable returns ()
+#define function approve(address,uint256) nonpayable returns ()
+#define function setApprovalForAll(address,bool) nonpayable returns ()
+
+#define function getApproved(uint256) view returns (address)
+#define function isApprovedForAll(address,address) view returns (uint256)
+#define function ownerOf(uint256) view returns (address)
+#define function balanceOf(address) view returns (uint256)
+
+/* Events */
+#define event Transfer(address,address,uint256)
+#define event Approval(address,address,uint256)
+#define event ApprovalForAll(address,address,bool)
+
+/* Storage Slots */
