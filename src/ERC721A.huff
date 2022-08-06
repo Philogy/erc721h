@@ -56,6 +56,7 @@
   [START_TOKEN_ID] [SLOT_GLOBAL_INDICES] sstore // _currentIndex = START_TOKEN_ID
 }
 
+// only 13 methods but 16 possible bit sequences, gaps filled with continue label
 #define jumptable __ERC721H__SELECTOR_TABLE {
   __ERC721H__balanceOf
   __ERC721H__selectorSwitchEnd
@@ -75,12 +76,16 @@
   __ERC721H__selectorSwitchEnd
 }
 
-// TODO: Future args name, symbol, tokenURI, supportsInterface
+/**
+ * TODO: Future macro args name, symbol, tokenURI, supportsInterface
+ * @dev the 13 ERC721 methods each have a unique 4-bit sequence 10 bits in
+ * which is used for the constant lookup in the jump table
+ */
 #define macro ERC721H_SELECTOR_SWITCH() = takes(1) returns(1) {
   // takes:         [selector]
   0x20           // [0x20, selector]
   // needs to be multiplied by 32 (<< 5) for table offset
-  // thus 10 (total offset) - 5
+  // thus 10 (total offset) - 5 = 5
   dup2 0x5 shr   // [selector >> 5, 0x20 selector]
   // 4-bit mask shift left 5 to meet selector
   0x1e0 and      // [table_offset, 0x20, selector]
@@ -91,6 +96,8 @@
   returndatasize // [0x0, selector]
   mload jump     // [selector]
 
+  // direct signature comparison to check for collisions, necessary for this
+  // switch to be used with more methods
   __ERC721H__balanceOf:
     dup1 __FUNC_SIG(balanceOf) eq iszero __ERC721H__selectorSwitchEnd jumpi
   __ERC721H__supportsInterface:
