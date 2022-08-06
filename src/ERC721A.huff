@@ -54,18 +54,19 @@
 
 #define macro _ERC721H__SELECTOR_SWITCH(name, symbol, tokenURI, supportsInterface) = takes(1) returns(1) {
   // takes: [selector]
-  dup1 __FUNC_SIG(setApprovalForAll) eq setApprovalForAll jumpi
-  dup1 [NO_DATA_SAFE_TRANSFER_FROM_SIG] eq noDataSafeTransferFrom jumpi
-  dup1 __FUNC_SIG(transferFrom) eq transferFrom jumpi
-  dup1 [DATA_SAFE_TRANSFER_FROM_SIG] eq dataSafeTransferFrom jumpi
-  _ERC721H__selector_switch_end jump
+  dup1 __FUNC_SIG(setApprovalForAll)    eq __ERC721H__setApprovalForAll      jumpi
+  dup1 [NO_DATA_SAFE_TRANSFER_FROM_SIG] eq __ERC721H__noDataSafeTransferFrom jumpi
+  dup1 __FUNC_SIG(transferFrom)         eq __ERC721H__transferFrom           jumpi
+  dup1 [DATA_SAFE_TRANSFER_FROM_SIG]    eq __ERC721H__dataSafeTransferFrom   jumpi
 
-  setApprovalForAll:
-  noDataSafeTransferFrom:
-  transferFrom:
-  dataSafeTransferFrom:
+  __ERC721H__selectorSwitchEnd jump
 
-  _ERC721H__selector_switch_end:
+  __ERC721H__setApprovalForAll:
+  __ERC721H__noDataSafeTransferFrom:
+  __ERC721H__transferFrom:
+  __ERC721H__dataSafeTransferFrom:
+
+  __ERC721H__selectorSwitchEnd:
 }
 
 // TODO: Remove, only to appease compiler
