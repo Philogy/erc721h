@@ -46,7 +46,7 @@
 /* Storage Layout */
 // _currentIndex (size: 128, offset: 0) - The next token ID to be minted
 // _burnCounter (size: 128, offset: 128) - Global amount of tokens burnt
-#define constant SLOT_GLOBAL_INDICES = FREE_STORAGE_POINTER()
+#define constant SLOT__GLOBAL_INDICES = FREE_STORAGE_POINTER()
 
 #define macro _ERC721H__CONSTRUCTOR() = takes(0) returns(0) {
   [START_TOKEN_ID] [SLOT_GLOBAL_INDICES] sstore // _currentIndex = START_TOKEN_ID
