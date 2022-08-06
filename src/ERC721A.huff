@@ -40,19 +40,19 @@
 #define function supportsInterface(bytes4) view returns (bool)
 
 /* ERC721H */
-#define constant START_TOKEN_ID = 0x0
+#define constant ERC721H__START_TOKEN_ID = 0x0
 
 
 /* Storage Layout */
 // _currentIndex (size: 128, offset: 0) - The next token ID to be minted
 // _burnCounter (size: 128, offset: 128) - Global amount of tokens burnt
-#define constant SLOT__GLOBAL_INDICES = FREE_STORAGE_POINTER()
+#define constant ERC721H_SLOT__GLOBAL_INDICES = FREE_STORAGE_POINTER()
 
-#define macro _ERC721H__CONSTRUCTOR() = takes(0) returns(0) {
+#define macro ERC721H_CONSTRUCTOR() = takes(0) returns(0) {
   [START_TOKEN_ID] [SLOT_GLOBAL_INDICES] sstore // _currentIndex = START_TOKEN_ID
 }
 
-#define macro _ERC721H__SELECTOR_SWITCH(name, symbol, tokenURI, supportsInterface) = takes(1) returns(1) {
+#define macro ERC721H_SELECTOR_SWITCH(name, symbol, tokenURI, supportsInterface) = takes(1) returns(1) {
   // takes: [selector]
   dup1 __FUNC_SIG(setApprovalForAll)    eq __ERC721H__setApprovalForAll      jumpi
   dup1 [NO_DATA_SAFE_TRANSFER_FROM_SIG] eq __ERC721H__noDataSafeTransferFrom jumpi
