@@ -49,11 +49,13 @@
 
 
 /* Storage Layout */
+#define constant MASK64 = 0xffffffffffffffff
 
-// _globalIndices.currentIndex (size: 64, offset:  0) - the next token ID to be minted
-// _globalIndices.burnCounter  (size: 64, offset: 64) - global amount of tokens burnt
-#define constant ERC721H__CURRENT_INDEX_MASK = 0xffffffffffffffff
-#define constant ERC721H__BURN_COUNTER_MASK = 0xffffffffffffffff0000000000000000
+
+// _globalIndices.currentIndex (size:  64, offset:   0) - the next token ID to be minted
+// _globalIndices.burnCounter  (size:  64, offset:  64) - global amount of tokens burnt
+// _globalIndices.extraData    (size: 128, offset: 128) - arbitrary auxillary data
+#define constant ERC721H__NOT_CUR_INDEX_MASK = 0xffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000
 #define constant ERC721H_SLOT__GLOBAL_INDICES = FREE_STORAGE_POINTER()
 
 // _packedAddressData: mapping((account) => (aux, balance)) [keccak256(<slotConstant> . account)]
@@ -89,6 +91,18 @@
     0x20 callvalue return
 }
 
+#define macro TOTAL_SUPPLY() = takes(0) returns(0) {
+  NO_VALUE_CHECK(returndatasize)
+  [ERC721H__START_TOKEN_ID]            // [startTokenId]
+  [ERC721H_SLOT__GLOBAL_INDICES] sload // [globalIndices, startTokenId]
+  [MASK64]                             // [mask64, globalIndices, startTokenId]
+  dup1 dup3 0x40 shr and               // [burnCounter, mask64, globalIndices, startTokenId]
+  swap2 and                            // [currentIndex, burnCounter, startTokenId]
+  sub sub                              // [totalSupply]
+  callvalue mstore                     // []
+  0x20 callvalue return
+}
+
 #define error MintZeroQuantity()
 #define error MintToZeroAddress()
 
@@ -116,16 +130,16 @@
   [ERC721H_SLOT__GLOBAL_INDICES]
   //                    [glob_indices_slot, to, quantity]
   dup1 sload         // [glob_indices, glob_indices_slot, to, quantity]
-  dup1 [ERC721H__CURRENT_INDEX_MASK] and
+  dup1 [MASK64] and
   //                    [currentIndex, glob_indices, glob_indices_slot, to, quantity]
   swap4 dup5 add     // [lastIndex_notMasked, glob_indices, glob_indices_slot, to, currentIndex]
-  [ERC721H__CURRENT_INDEX_MASK] and
+  [MASK64] and
   //                    [lastIndex, glob_indices, glob_indices_slot, to, currentIndex]
-  dup1 swap3         // [glob_indices, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
-  [ERC721H__BURN_COUNTER_MASK] and
-  //                    [burnCounter << 64, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
+  dup1 swap2         // [glob_indices, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
+  [ERC721H__NOT_CUR_INDEX_MASK] and
+  //                    [global_indices \ currentIndex, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
   or                 // [glob_indices', lastIndex, glob_indices_slot, to, currentIndex]
-  swap1 swap3        // [glob_indices_slot, glob_indices', lastIndex, to, currentIndex]
+  swap1 swap2        // [glob_indices_slot, glob_indices', lastIndex, to, currentIndex]
   sstore             // [lastIndex, to, currentIndex]
 
   // -- save owner of tokens
@@ -142,7 +156,7 @@
     //                  [0, 0, Transfer.sig, 0, to, curTokenId, curTokenId, to, lastIndex]
     log4             // [curTokenId, to, lastIndex]
     0x1 add          // [curTokenId + 1, to, lastIndex]
-    dup2 dup3 sub    // [curTokenId + 1 != lastIndex, curTokenId + 1, to, lastIndex]
+    dup3 dup2 sub    // [curTokenId + 1 != lastIndex, curTokenId + 1, to, lastIndex]
     __ERC721__mintNextLoop jumpi
   //                    [lastIndex, to, lastIndex]
 }
@@ -154,10 +168,10 @@
 
 // only 13 methods but 16 possible bit sequences, gaps filled with continue label
 #define jumptable __ERC721H__SELECTOR_TABLE {
-  __ERC721H__selectorSwitchContinue // gap
+  __ERC721H__totalSupply
   __ERC721H__getApproved
   __ERC721H__ownerOf
-  __ERC721H__totalSupply
+  __ERC721H__selectorSwitchContinue // gap
   __ERC721H__dataSafeTransferFrom
   __ERC721H__tokenURI
   __ERC721H__selectorSwitchContinue // gap
@@ -174,7 +188,7 @@
 
 /**
  * TODO: Future macro args name, symbol, tokenURI, supportsInterface
- * @dev the 13 ERC721 methods each have a unique 4-bit sequence 10 bits in
+ * @dev 13 ERC721 methods each have a unique 4-bit sequence 12 bits in
  * which is used for the constant lookup in the jump table
  */
 #define macro ERC721H_SELECTOR_SWITCH(name, symbol, tokenURI) = takes(1) returns(1) {
@@ -183,8 +197,8 @@
   //                [selector]
   0x20           // [0x20, selector]
   // needs to be multiplied by 32 (<< 5) for table offset
-  // >> 10; << 5; simplifies to >> 5
-  dup2 0x5 shr   // [selector >> 5, 0x20 selector]
+  // >> 12; << 5; simplifies to >> 5
+  dup2 0x7 shr   // [selector >> 5, 0x20 selector]
   // 4-bit mask shift left 5 to meet selector
   0x1e0 and      // [table_offset, 0x20, selector]
   __tablestart(__ERC721H__SELECTOR_TABLE) add
@@ -204,6 +218,7 @@
     dup1 __FUNC_SIG(ownerOf) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__totalSupply:
     dup1 __FUNC_SIG(totalSupply) sub __ERC721H__selectorSwitchContinue jumpi
+    TOTAL_SUPPLY()
   __ERC721H__dataSafeTransferFrom:
     dup1 [SIG_DATA_SAFE_TRANSFER_FROM] sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__tokenURI:

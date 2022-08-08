@@ -29,7 +29,7 @@ async function main() {
     'function symbol()',
     'function tokenURI(uint256)',
     'function approve(address,uint256)',
-    'function safeTransferFrom(address,address,uint256)',
+    //'function safeTransferFrom(address,address,uint256)',
     'function safeTransferFrom(address,address,uint256,bytes)',
     'function setApprovalForAll(address,bool)',
     'function transferFrom(address,address,uint256)',
@@ -38,6 +38,7 @@ async function main() {
     'function isApprovedForAll(address,address)',
     'function ownerOf(uint256)',
     'function supportsInterface(bytes4)',
+    'function totalSupply()',
   ])
   const functionArr = Array.from(Object.keys(nft.functions))
   console.log('functionArr: ', functionArr)
@@ -46,14 +47,14 @@ async function main() {
   const sigs = functionArr.map(getNumSighash)
 
   const [usefulShift, mask, bits] = tryFindUsefulShift(sigs)
-  console.log('usefulShift: ', usefulShift)
-  console.log(`mask: 0x${mask.toString(16)}`)
-  console.log('bits: ', bits)
-  console.log(`total functions: ${sigs.length}`)
-
-  const getBits = (fn) => (getNumSighash(fn) >> usefulShift) & mask
 
   if (usefulShift !== null) {
+    console.log('usefulShift: ', usefulShift)
+    console.log(`mask: 0x${mask.toString(16)}`)
+    console.log('bits: ', bits)
+    console.log(`total functions: ${sigs.length}`)
+
+    const getBits = (fn) => (getNumSighash(fn) >> usefulShift) & mask
     const fns = {}
     functionArr
       .sort((a, b) => getBits(a) - getBits(b))
@@ -65,6 +66,8 @@ async function main() {
       const fnAsStr = fn !== undefined ? `${fn} [${nft.getSighash(fn)}]` : '-'
       console.log(`{${i.toString(2).padStart(bits, '0')}} ${fnAsStr}`)
     }
+  } else {
+    console.log('no shift found')
   }
 }
 
