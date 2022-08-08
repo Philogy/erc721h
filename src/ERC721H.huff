@@ -232,10 +232,3 @@
     0x00 mstore                                             // []
     0x20 0x00 return                                        // []
 }
-
-#define macro OWNER_OF() = takes (0) returns (0) {
-    0x04 calldataload                               // [tokenId]
-    [OWNER_LOCATION] LOAD_ELEMENT_FROM_KEYS(0x00)   // [owner]
-    0x00 mstore                                     // []
-    0x20 0x00 return                                // []
-}
