@@ -48,9 +48,31 @@
 
 
 /* Storage Layout */
-// _currentIndex (size: 128, offset: 0) - The next token ID to be minted
-// _burnCounter (size: 128, offset: 128) - Global amount of tokens burnt
+
+// _globalIndices.currentIndex (size: 128, offset:   0) - the next token ID to be minted
+// _globalIndices.burnCounter  (size: 128, offset: 128) - global amount of tokens burnt
 #define constant ERC721H_SLOT__GLOBAL_INDICES = FREE_STORAGE_POINTER()
+
+// _packedAddressData: mapping((account) => (aux, balance)) [keccak256(<slotConstant> . account)]
+// _packedAddressData[].balance (size:  64, offset:  0) - how many tokens the address owns
+// _packedAddressData[].aux     (size: 196, offset: 64) - arbitrary auxillary data
+#define constant ERC721H_SLOT__PACKED_ADDRESS_DATA = FREE_STORAGE_POINTER()
+
+// slotConstant = keccak256("erc721h.storageLayout._packedOwnerships")
+// _packedOwnerships: mapping((tokenId) => (aux, burned, addr)) [<slotConstant> + tokenId]
+// _packedOwnerships[].addr   (size: 160, offset:   0) - owner / 0 if minted in batch
+// _packedOwnerships[].burned (size:   1, offset: 160) - 1 if token was already burnt
+// _packedOwnerships[].aux    (size:  95, offset: 161) - arbitrary auxillary data
+#define constant ERC721H_SLOT__OWNER_DATA = 0xc467d14b14f0170613c30fe1df235f316f42dc7d319044e13f083a1bdf2761b0
+
+// _operatorApprovals: mapping((owner, operator) => (isApproved)) [keccak256(<slotConstant> . owner . operator)]
+#define constant ERC721H_SLOT__OPERATOR_APPROVALS = FREE_STORAGE_POINTER()
+
+// slotConstant = keccak256("erc721h.storageLayout._tokenApprovals")
+// _tokenApprovals: mapping((tokenId) => (approvedAddr)) [<slotConstant> + tokenId]
+#define constant ERC721H_SLOT__TOKEN_APPROVALS = 0x62b148735602bc106b11fdd0c804fa886d55bf94ee772f275741dfa7c159ab42
+
+
 
 #define macro ERC721H_CONSTRUCTOR() = takes(0) returns(0) {
   [START_TOKEN_ID] [SLOT_GLOBAL_INDICES] sstore // _currentIndex = START_TOKEN_ID
