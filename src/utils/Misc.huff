@@ -1,5 +1,11 @@
 #define error Panic(uint256)
 
+#define macro REVERT_SIG(zero) = takes(1) returns(0) {
+  // takes:           [error_sig]
+  <zero> mstore    // []
+  0x04 0x1c revert // []
+}
+
 
 /* the remaining error sig is explicitly not popped, can be useful if chaining
  * multiple conditions into an AND-type conditional statement
@@ -13,10 +19,9 @@
  */
 #define macro REQUIRE(zero) = takes (2) returns (1) {
   // takes:                       [condition, error_sig]
-  utils_require_continue jumpi // [error_sig]
-  <zero> mstore                // []
-  0x04 0x1c revert
-  utils_require_continue:      // [error_sig]
+  __Utils_Misc__requireContinue jumpi // [error_sig]
+  REVERT_SIG(<zero>)
+  __Utils_Misc__requireContinue:      // [error_sig]
 }
 
 /// @dev underflow safe subtraction with custom error (4-byte error sig only, no args)
@@ -33,9 +38,9 @@
   // takes:    [x, y]
   dup2 dup2 // [x, y, x, y]
   lt iszero // [x >= y, x, y]
-  continue_safe_sub jumpi
+  __Utils_Misc__safeSubContinue jumpi
   0x11 PANIC(<zero>)
-  continue_safe_sub:
+  __Utils_Misc__safeSubContinue:
     sub     // [x - y]
 }
 
@@ -45,16 +50,16 @@
   add        // [y + x, y]
   swap1 dup2 // [y + x, y, y + x]
   lt iszero  // [y + x >= y, y + x]
-  continue_safe_add jumpi
+  __Utils_Misc__safeAddContinue jumpi
   0x11 PANIC(<zero>)
-  continue_safe_add:
+  __Utils_Misc__safeAddContinue:
   //            [y + x]
 }
 
 #define macro NO_VALUE_CHECK(zero) = takes(0) returns(0) {
-  callvalue iszero continue_after_value_check jumpi
+  callvalue iszero __Utils_Misc__valueCheckContinue jumpi
   <zero> <zero> revert
-  continue_after_value_check:
+  __Utils_Misc__valueCheckContinue:
 }
 
 #define macro RETURN1(zero) = takes(1) returns(0) {
