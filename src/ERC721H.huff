@@ -15,9 +15,10 @@
 #define event ApprovalForAll(address, address, bool)
 
 /* ERC721 Interface -- Metadata */
-#define function name() nonpayable returns (string)
-#define function symbol() nonpayable returns (string)
-#define function tokenURI(uint256) nonpayable returns (string)
+#define function name() view returns (string)
+#define function symbol() view returns (string)
+#define function tokenURI(uint256) view returns (string)
+#define function totalSupply() view returns (uint256)
 
 /* ERC721 Interface -- Transfer */
 #define function transferFrom(address, address, uint256) nonpayable returns ()
@@ -49,8 +50,10 @@
 
 /* Storage Layout */
 
-// _globalIndices.currentIndex (size: 128, offset:   0) - the next token ID to be minted
-// _globalIndices.burnCounter  (size: 128, offset: 128) - global amount of tokens burnt
+// _globalIndices.currentIndex (size: 64, offset:  0) - the next token ID to be minted
+// _globalIndices.burnCounter  (size: 64, offset: 64) - global amount of tokens burnt
+#define constant ERC721H__CURRENT_INDEX_MASK = 0xffffffffffffffff
+#define constant ERC721H__BURN_COUNTER_MASK = 0xffffffffffffffff0000000000000000
 #define constant ERC721H_SLOT__GLOBAL_INDICES = FREE_STORAGE_POINTER()
 
 // _packedAddressData: mapping((account) => (aux, balance)) [keccak256(<slotConstant> . account)]
@@ -73,6 +76,65 @@
 #define constant ERC721H_SLOT__TOKEN_APPROVALS = 0x62b148735602bc106b11fdd0c804fa886d55bf94ee772f275741dfa7c159ab42
 
 
+#define error MintZeroQuantity()
+#define error MintToZeroAddress()
+
+
+#define macro MINT(zero, mem1, mem2) = takes(2) returns(3) {
+  // takes:             [to, quantity]
+
+  // -- check quantity > 0
+  __FUNC_SIG(MintZeroQuantity) dup3 REQUIRE(<zero>) pop
+  //                    [to, quantity]
+
+  // -- check address != 0
+  __FUNC_SIG(MintToZeroAddress) dup2 REQUIRE(<zero>) pop
+  //                    [to, quantity]
+
+  // -- update balance
+  [ERC721H_SLOT__PACKED_ADDRESS_DATA] <mem1> mstore
+  //                    [to, quantity]
+  dup1 <mem2> mstore // [to, quantity]
+  0x40 <mem1> sha3   // [address_data_slot, to, quantity]
+  dup1 sload         // [address_data, address_data_slot, to, quantity]
+  dup4 add           // [address_data', address_data_slot, to, quantity]
+  swap1 sstore       // [to, quantity]
+
+  // -- get and update current index (= first index in batch)
+  [ERC721H_SLOT__GLOBAL_INDICES]
+  //                    [glob_indices_slot, to, quantity]
+  dup1 sload         // [glob_indices, glob_indices_slot, to, quantity]
+  dup1 [ERC721H__CURRENT_INDEX_MASK] and
+  //                    [currentIndex, glob_indices, glob_indices_slot, to, quantity]
+  swap4 dup5 add     // [lastIndex_notMasked, glob_indices, glob_indices_slot, to, currentIndex]
+  [ERC721H__CURRENT_INDEX_MASK] and
+  //                    [lastIndex, glob_indices, glob_indices_slot, to, currentIndex]
+  dup1 swap3         // [glob_indices, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
+  [ERC721H__BURN_COUNTER_MASK] and
+  //                    [burnCounter << 64, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
+  or                 // [glob_indices', lastIndex, glob_indices_slot, to, currentIndex]
+  swap1 swap3        // [glob_indices_slot, glob_indices', lastIndex, to, currentIndex]
+  sstore             // [lastIndex, to, currentIndex]
+
+  // -- save owner of tokens
+  dup2               // [to, lastIndex, to, currentIndex]
+  dup4 [ERC721H_SLOT__OWNER_DATA] add
+  //                    [tokenSlot, to, lastIndex, to, currentIndex]
+  sstore             // [lastIndex, to, currentIndex]
+  swap2              // [currentIndex, to, lastIndex]
+
+  // -- emit transfer events
+  __ERC721__mintNextLoop:
+  //                    [curTokenId, to, lastIndex]
+    dup1 dup3 <zero> __EVENT_HASH(Transfer) <zero> <zero>
+    //                  [0, 0, Transfer.sig, 0, to, curTokenId, curTokenId, to, lastIndex]
+    log4             // [curTokenId, to, lastIndex]
+    0x1 add          // [curTokenId + 1, to, lastIndex]
+    dup2 dup3 sub    // [curTokenId + 1 != lastIndex, curTokenId + 1, to, lastIndex]
+    __ERC721__mintNextLoop jumpi
+  //                    [lastIndex, to, lastIndex]
+}
+
 
 #define macro ERC721H_CONSTRUCTOR() = takes(0) returns(0) {
   [START_TOKEN_ID] [SLOT_GLOBAL_INDICES] sstore // _currentIndex = START_TOKEN_ID
@@ -81,7 +143,7 @@
 // only 13 methods but 16 possible bit sequences, gaps filled with continue label
 #define jumptable __ERC721H__SELECTOR_TABLE {
   __ERC721H__balanceOf
-  __ERC721H__selectorSwitchEnd // gap
+  __ERC721H__selectorSwitchContinue // gap
   __ERC721H__supportsInterface
   __ERC721H__dataSafeTransferFrom
   __ERC721H__getApproved
@@ -94,8 +156,8 @@
   __ERC721H__noDataSafeTransferFrom
   __ERC721H__transferFrom
   __ERC721H__setApprovalForAll
-  __ERC721H__selectorSwitchEnd // gap
-  __ERC721H__selectorSwitchEnd // gap
+  __ERC721H__selectorSwitchContinue // gap
+  __ERC721H__selectorSwitchContinue // gap
 }
 
 /**
@@ -121,40 +183,41 @@
   // direct signature comparison to check for collisions, necessary for this
   // switch to be used with more methods
   __ERC721H__balanceOf:
-    dup1 __FUNC_SIG(balanceOf) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(balanceOf) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__supportsInterface:
-    dup1 __FUNC_SIG(supportsInterface) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(supportsInterface) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__dataSafeTransferFrom:
-    dup1 [SIG_DATA_SAFE_TRANSFER_FROM] eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 [SIG_DATA_SAFE_TRANSFER_FROM] sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__getApproved:
-    dup1 __FUNC_SIG(getApproved) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(getApproved) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__tokenURI:
-    dup1 __FUNC_SIG(tokenURI) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(tokenURI) sub __ERC721H__selectorSwitchContinue jumpi
     <tokenURI> jump
   __ERC721H__symbol:
-    dup1 __FUNC_SIG(symbol) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(symbol) sub __ERC721H__selectorSwitchContinue jumpi
     <symbol> jump
   __ERC721H__name:
-    dup1 __FUNC_SIG(name) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(name) sub __ERC721H__selectorSwitchContinue jumpi
     <name> jump
   __ERC721H__ownerOf:
-    dup1 __FUNC_SIG(ownerOf) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(ownerOf) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__approve:
-    dup1 __FUNC_SIG(approve) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(approve) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__isApprovedForAll:
-    dup1 __FUNC_SIG(isApprovedForAll) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(isApprovedForAll) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__noDataSafeTransferFrom:
-    dup1 [SIG_NO_DATA_SAFE_TRANSFER_FROM] eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 [SIG_NO_DATA_SAFE_TRANSFER_FROM] sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__transferFrom:
-    dup1 __FUNC_SIG(transferFrom) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(transferFrom) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__setApprovalForAll:
-    dup1 __FUNC_SIG(setApprovalForAll) eq iszero __ERC721H__selectorSwitchEnd jumpi
+    dup1 __FUNC_SIG(setApprovalForAll) sub __ERC721H__selectorSwitchContinue jumpi
 
-  __ERC721H__selectorSwitchEnd:
+  __ERC721H__selectorSwitchContinue:
 }
 
 // TODO: Remove, only to appease compiler
 #define macro MAIN() = takes(0) returns(0) {
   GET_SELECTOR()
   ERC721H_SELECTOR_SWITCH()
+  returndatasize returndatasize revert
 }
