@@ -75,8 +75,8 @@
 #define constant ERC721H_SLOT__TOKEN_APPROVALS = FREE_STORAGE_POINTER()
 
 
-#define error MintZeroQuantity()
-#define error MintToZeroAddress()
+// #define error MintZeroQuantity()
+// #define error MintToZeroAddress()
 
 
 #define macro MINT(zero, mem1, mem2) = takes(2) returns(3) {
@@ -223,4 +223,19 @@
   GET_SELECTOR()
   ERC721H_SELECTOR_SWITCH()
   returndatasize returndatasize revert
+}
+
+/* View functions */
+#define macro BALANCE_OF() = takes (0) returns (0) {
+    0x04 calldataload                                       // [account]
+    [ERC721H_SLOT__OWNER_DATA] LOAD_ELEMENT_FROM_KEYS(0x00) // [balance]
+    0x00 mstore                                             // []
+    0x20 0x00 return                                        // []
+}
+
+#define macro OWNER_OF() = takes (0) returns (0) {
+    0x04 calldataload                               // [tokenId]
+    [OWNER_LOCATION] LOAD_ELEMENT_FROM_KEYS(0x00)   // [owner]
+    0x00 mstore                                     // []
+    0x20 0x00 return                                // []
 }
