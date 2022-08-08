@@ -59,6 +59,7 @@
 // _packedAddressData: mapping((account) => (aux, balance)) [keccak256(<slotConstant> . account)]
 // _packedAddressData[].balance (size:  64, offset:  0) - how many tokens the address owns
 // _packedAddressData[].aux     (size: 196, offset: 64) - arbitrary auxillary data
+#define constant ERC721H__BALANCE_MASK = 0xffffffffffffffff
 #define constant ERC721H_SLOT__PACKED_ADDRESS_DATA = FREE_STORAGE_POINTER()
 
 // slotConstant = keccak256("erc721h.storageLayout._packedOwnerships")
@@ -77,11 +78,15 @@
 
 
 /* View functions */
-#define macro BALANCE_OF() = takes (0) returns (0) {
-    0x04 calldataload                                       // [account]
-    [ERC721H_SLOT__OWNER_DATA] LOAD_ELEMENT_FROM_KEYS(0x00) // [balance]
-    0x00 mstore                                             // []
-    0x20 0x00 return                                        // []
+#define macro __ERC721H__BALANCE_OF() = takes (0) returns (0) {
+    NO_VALUE_CHECK(returndatasize)
+    [ERC721H_SLOT__PACKED_ADDRESS_DATA] callvalue mstore
+    0x04 calldataload 0x20 mstore
+    0x40 callvalue sha3
+    sload
+    [ERC721H__BALANCE_MASK] and
+    callvalue mstore
+    0x20 callvalue return
 }
 
 #define error MintZeroQuantity()
@@ -208,6 +213,7 @@
     dup1 __FUNC_SIG(transferFrom) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__balanceOf:
     dup1 __FUNC_SIG(balanceOf) sub __ERC721H__selectorSwitchContinue jumpi
+    __ERC721H__BALANCE_OF()
   __ERC721H__symbol:
     dup1 __FUNC_SIG(symbol) sub __ERC721H__selectorSwitchContinue jumpi
     <symbol> jump
