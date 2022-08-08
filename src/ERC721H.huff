@@ -10,9 +10,9 @@
 /* ERC721 Interface */
 
 /* ERC721 Interface -- Events */
-#define event Transfer(address, address, uint256)
-#define event Approval(address, address, uint256)
-#define event ApprovalForAll(address, address, bool)
+#define event Transfer(address indexed, address indexed, uint256 indexed)
+#define event Approval(address indexed, address indexed, uint256 indexed)
+#define event ApprovalForAll(address indexed, address indexed, bool)
 
 /* ERC721 Interface -- Metadata */
 #define function name() view returns (string)
@@ -79,7 +79,7 @@
 #define error MintToZeroAddress()
 
 
-#define macro MINT(zero, mem1, mem2) = takes(2) returns(3) {
+#define macro ERC721H__MINT(zero, mem1, mem2) = takes(2) returns(3) {
   // takes:             [to, quantity]
 
   // -- check quantity > 0
@@ -216,11 +216,4 @@
     dup1 __FUNC_SIG(isApprovedForAll) sub __ERC721H__selectorSwitchContinue jumpi
 
   __ERC721H__selectorSwitchContinue:
-}
-
-// TODO: Remove, only to appease compiler
-#define macro MAIN() = takes(0) returns(0) {
-  GET_SELECTOR()
-  ERC721H_SELECTOR_SWITCH()
-  returndatasize returndatasize revert
 }
