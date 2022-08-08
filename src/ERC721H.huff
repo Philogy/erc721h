@@ -71,9 +71,8 @@
 // _operatorApprovals: mapping((owner, operator) => (isApproved)) [keccak256(<slotConstant> . owner . operator)]
 #define constant ERC721H_SLOT__OPERATOR_APPROVALS = FREE_STORAGE_POINTER()
 
-// slotConstant = keccak256("erc721h.storageLayout._tokenApprovals")
-// _tokenApprovals: mapping((tokenId) => (approvedAddr)) [<slotConstant> + tokenId]
-#define constant ERC721H_SLOT__TOKEN_APPROVALS = 0x62b148735602bc106b11fdd0c804fa886d55bf94ee772f275741dfa7c159ab42
+// _tokenApprovals: mapping((tokenId) => (approvedAddr)) [keccak256(<slotConstant> . tokenId)]
+#define constant ERC721H_SLOT__TOKEN_APPROVALS = FREE_STORAGE_POINTER()
 
 
 #define error MintZeroQuantity()
@@ -142,21 +141,21 @@
 
 // only 13 methods but 16 possible bit sequences, gaps filled with continue label
 #define jumptable __ERC721H__SELECTOR_TABLE {
-  __ERC721H__balanceOf
   __ERC721H__selectorSwitchContinue // gap
-  __ERC721H__supportsInterface
-  __ERC721H__dataSafeTransferFrom
   __ERC721H__getApproved
-  __ERC721H__tokenURI
-  __ERC721H__symbol
-  __ERC721H__name
   __ERC721H__ownerOf
-  __ERC721H__approve
-  __ERC721H__isApprovedForAll
-  __ERC721H__noDataSafeTransferFrom
-  __ERC721H__transferFrom
-  __ERC721H__setApprovalForAll
+  __ERC721H__totalSupply
+  __ERC721H__dataSafeTransferFrom
+  __ERC721H__tokenURI
   __ERC721H__selectorSwitchContinue // gap
+  __ERC721H__transferFrom
+  __ERC721H__balanceOf
+  __ERC721H__symbol
+  __ERC721H__approve
+  __ERC721H__setApprovalForAll
+  __ERC721H__supportsInterface
+  __ERC721H__name
+  __ERC721H__isApprovedForAll
   __ERC721H__selectorSwitchContinue // gap
 }
 
@@ -167,6 +166,8 @@
  */
 #define macro ERC721H_SELECTOR_SWITCH(name, symbol, tokenURI) = takes(1) returns(1) {
   // takes:         [selector]
+  dup1 [SIG_NO_DATA_SAFE_TRANSFER_FROM] eq __ERC721H__noDataSafeTransferFrom jumpi
+  //                [selector]
   0x20           // [0x20, selector]
   // needs to be multiplied by 32 (<< 5) for table offset
   // >> 10; << 5; simplifies to >> 5
@@ -180,37 +181,39 @@
   returndatasize // [0x0, selector]
   mload jump     // [selector]
 
+  __ERC721H__noDataSafeTransferFrom:
+
   // direct signature comparison to check for collisions, necessary for this
   // switch to be used with more methods
-  __ERC721H__balanceOf:
-    dup1 __FUNC_SIG(balanceOf) sub __ERC721H__selectorSwitchContinue jumpi
-  __ERC721H__supportsInterface:
-    dup1 __FUNC_SIG(supportsInterface) sub __ERC721H__selectorSwitchContinue jumpi
-  __ERC721H__dataSafeTransferFrom:
-    dup1 [SIG_DATA_SAFE_TRANSFER_FROM] sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__getApproved:
     dup1 __FUNC_SIG(getApproved) sub __ERC721H__selectorSwitchContinue jumpi
+  __ERC721H__ownerOf:
+    dup1 __FUNC_SIG(ownerOf) sub __ERC721H__selectorSwitchContinue jumpi
+  __ERC721H__totalSupply:
+    dup1 __FUNC_SIG(totalSupply) sub __ERC721H__selectorSwitchContinue jumpi
+  __ERC721H__dataSafeTransferFrom:
+    dup1 [SIG_DATA_SAFE_TRANSFER_FROM] sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__tokenURI:
     dup1 __FUNC_SIG(tokenURI) sub __ERC721H__selectorSwitchContinue jumpi
     <tokenURI> jump
+  __ERC721H__transferFrom:
+    dup1 __FUNC_SIG(transferFrom) sub __ERC721H__selectorSwitchContinue jumpi
+  __ERC721H__balanceOf:
+    dup1 __FUNC_SIG(balanceOf) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__symbol:
     dup1 __FUNC_SIG(symbol) sub __ERC721H__selectorSwitchContinue jumpi
     <symbol> jump
+  __ERC721H__approve:
+    dup1 __FUNC_SIG(approve) sub __ERC721H__selectorSwitchContinue jumpi
+  __ERC721H__setApprovalForAll:
+    dup1 __FUNC_SIG(setApprovalForAll) sub __ERC721H__selectorSwitchContinue jumpi
+  __ERC721H__supportsInterface:
+    dup1 __FUNC_SIG(supportsInterface) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__name:
     dup1 __FUNC_SIG(name) sub __ERC721H__selectorSwitchContinue jumpi
     <name> jump
-  __ERC721H__ownerOf:
-    dup1 __FUNC_SIG(ownerOf) sub __ERC721H__selectorSwitchContinue jumpi
-  __ERC721H__approve:
-    dup1 __FUNC_SIG(approve) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__isApprovedForAll:
     dup1 __FUNC_SIG(isApprovedForAll) sub __ERC721H__selectorSwitchContinue jumpi
-  __ERC721H__noDataSafeTransferFrom:
-    dup1 [SIG_NO_DATA_SAFE_TRANSFER_FROM] sub __ERC721H__selectorSwitchContinue jumpi
-  __ERC721H__transferFrom:
-    dup1 __FUNC_SIG(transferFrom) sub __ERC721H__selectorSwitchContinue jumpi
-  __ERC721H__setApprovalForAll:
-    dup1 __FUNC_SIG(setApprovalForAll) sub __ERC721H__selectorSwitchContinue jumpi
 
   __ERC721H__selectorSwitchContinue:
 }
