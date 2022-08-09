@@ -13,3 +13,9 @@ Huff.
   private) with a double underscore e.g. `__ERC721H__selectorSwitchEnd`
 - use camel case for labels / custom function signatures
 - use snake case for macros / constants
+
+## Using ERC721H
+### Using ERC721H - Security Considerations
+- Excessively large, arbitrary `ERC721H__START_TOKEN_ID` values may lead to
+  owner data storage slots colliding with other variables, leading to a suite of
+  bugs / vulnerabilities
