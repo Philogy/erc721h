@@ -4,6 +4,8 @@
 
 #define function mint(address, uint256) nonpayable returns ()
 
+#define constant ERC721H__START_TOKEN_ID = 0x1
+
 #define macro MINT() = takes(0) returns(0) {
   NO_VALUE_CHECK(returndatasize)
   0x24 calldataload  // [quantity]
@@ -16,6 +18,10 @@
   NO_VALUE_CHECK(returndatasize)
   0x20 callvalue mstore
   0x40 callvalue return
+}
+
+#define macro CONSTRUCTOR() = takes(0) returns(0) {
+  ERC721H_CONSTRUCTOR()
 }
 
 #define macro MAIN() = takes(0) returns(0) {
