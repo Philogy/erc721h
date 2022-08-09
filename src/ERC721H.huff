@@ -50,6 +50,8 @@
 
 /* Storage Layout */
 #define constant MASK64 = 0xffffffffffffffff
+#define constant MASK_ADDR = 0xffffffffffffffffffffffffffffffffffffffff
+#define constant NEG1 = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 
 // _globalIndices.currentIndex (size:  64, offset:   0) - the next token ID to be minted
@@ -61,14 +63,14 @@
 // _packedAddressData: mapping((account) => (aux, balance)) [keccak256(<slotConstant> . account)]
 // _packedAddressData[].balance (size:  64, offset:  0) - how many tokens the address owns
 // _packedAddressData[].aux     (size: 196, offset: 64) - arbitrary auxillary data
-#define constant ERC721H__BALANCE_MASK = 0xffffffffffffffff
 #define constant ERC721H_SLOT__PACKED_ADDRESS_DATA = FREE_STORAGE_POINTER()
 
 // slotConstant = keccak256("erc721h.storageLayout._packedOwnerships")
 // _packedOwnerships: mapping((tokenId) => (aux, burned, addr)) [<slotConstant> + tokenId]
 // _packedOwnerships[].addr   (size: 160, offset:   0) - owner / 0 if minted in batch
-// _packedOwnerships[].burned (size:   1, offset: 160) - 1 if token was already burnt
+// _packedOwnerships[].burned (size:   1, offset: 160) - if token was already burnt
 // _packedOwnerships[].aux    (size:  95, offset: 161) - arbitrary auxillary data
+#define constant ERC721H__BURNED_MASK = 0x10000000000000000000000000000000000000000
 #define constant ERC721H_SLOT__OWNER_DATA = 0xc467d14b14f0170613c30fe1df235f316f42dc7d319044e13f083a1bdf2761b0
 
 // _operatorApprovals: mapping((owner, operator) => (isApproved)) [keccak256(<slotConstant> . owner . operator)]
@@ -81,17 +83,16 @@
 
 /* View functions */
 #define macro __ERC721H__BALANCE_OF() = takes (0) returns (0) {
-    NO_VALUE_CHECK(returndatasize)
-    [ERC721H_SLOT__PACKED_ADDRESS_DATA] callvalue mstore
-    0x04 calldataload 0x20 mstore
-    0x40 callvalue sha3
-    sload
-    [ERC721H__BALANCE_MASK] and
-    callvalue mstore
-    0x20 callvalue return
+  NO_VALUE_CHECK(returndatasize)
+  [ERC721H_SLOT__PACKED_ADDRESS_DATA] callvalue mstore
+  0x04 calldataload 0x20 mstore
+  0x40 callvalue sha3 // [address_data_slot]
+  sload               // [address_data]
+  [MASK64] and        // [balance]
+  RETURN1(callvalue)
 }
 
-#define macro TOTAL_SUPPLY() = takes(0) returns(0) {
+#define macro __ERC721H__TOTAL_SUPPLY() = takes(0) returns(0) {
   NO_VALUE_CHECK(returndatasize)
   [ERC721H__START_TOKEN_ID]            // [startTokenId]
   [ERC721H_SLOT__GLOBAL_INDICES] sload // [globalIndices, startTokenId]
@@ -99,13 +100,57 @@
   dup1 dup3 0x40 shr and               // [burnCounter, mask64, globalIndices, startTokenId]
   swap2 and                            // [currentIndex, burnCounter, startTokenId]
   sub sub                              // [totalSupply]
-  callvalue mstore                     // []
-  0x20 callvalue return
+  RETURN1(callvalue)
+}
+
+#define error OwnerQueryForNonexistentToken()
+
+#define macro ERC721H__TOKEN_ID_EXISTS(zero) = takes(1) returns(1) {
+  // takes:                         [tokenId]
+
+  __FUNC_SIG(OwnerQueryForNonexistentToken)
+  //                                [error_sig, tokenId]
+  [ERC721H__START_TOKEN_ID] dup3 // [tokenId, startTokenId, error_sig, tokenId]
+  lt iszero REQUIRE(<zero>)      // [error_sig, tokenId]
+  [ERC721H_SLOT__GLOBAL_INDICES] sload
+  //                                [glob_indices, error_sig, tokenId]
+  [MASK64] and                   // [currentIndex, error_sig, tokenId]
+  dup3 lt REQUIRE(<zero>) pop    // [tokenId]
+}
+
+#define macro ERC721H__GET_OWNER_DATA_FOR() = takes(1) returns(2) {
+  // takes:     [initial_owner_data_slot]
+  dup1 sload // [owner_data, initial_owner_data_slot]
+  dup1 __ERC721H__getOwnerDataEnd jumpi
+  __ERC721H__getOwnerDataContinue:
+  //            [prev_owner_data, prev_owner_data_slot]
+  pop        // [prev_owner_data_slot]
+  [NEG1] add // [new_owner_data_slot]
+  dup1 sload // [new_owner_data, new_owner_data_slot]
+  dup1 iszero __ERC721H__getOwnerDataContinue jumpi
+
+  __ERC721H__getOwnerDataEnd:
+  //            [owner_data, orig_data_slot]
+}
+
+#define macro __ERC721H__OWNER_OF() = takes(0) returns(0) {
+  NO_VALUE_CHECK(returndatasize)
+  0x4 calldataload                    // [tokenId]
+  ERC721H__TOKEN_ID_EXISTS(callvalue) // [tokenId]
+  [ERC721H_SLOT__OWNER_DATA] add      // [initial_owner_data_slot]
+  ERC721H__GET_OWNER_DATA_FOR()       // [owner_data, orig_data_slot]
+  __FUNC_SIG(OwnerQueryForNonexistentToken)
+  //                                     [error_sig, owner_data, orig_data_slot]
+  dup2 [ERC721H__BURNED_MASK] and     // [burned_flag << 160, error_sig, owner_data, orig_data_slot]
+  iszero REQUIRE(callvalue) pop       // [owner_data, orig_data_slot]
+  [MASK_ADDR] and                     // [owner, orig_data_slot]
+  RETURN1(callvalue)
 }
 
 #define error MintZeroQuantity()
 #define error MintToZeroAddress()
 
+// TODO: take aux owner  token data
 #define macro ERC721H__MINT(zero, mem1, mem2) = takes(2) returns(3) {
   // takes:             [to, quantity]
 
@@ -163,7 +208,7 @@
 
 
 #define macro ERC721H_CONSTRUCTOR() = takes(0) returns(0) {
-  [START_TOKEN_ID] [SLOT_GLOBAL_INDICES] sstore // _currentIndex = START_TOKEN_ID
+  [ERC721H__START_TOKEN_ID] [ERC721H_SLOT__GLOBAL_INDICES] sstore // _currentIndex = START_TOKEN_ID
 }
 
 // only 13 methods but 16 possible bit sequences, gaps filled with continue label
@@ -216,9 +261,10 @@
     dup1 __FUNC_SIG(getApproved) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__ownerOf:
     dup1 __FUNC_SIG(ownerOf) sub __ERC721H__selectorSwitchContinue jumpi
+    __ERC721H__OWNER_OF()
   __ERC721H__totalSupply:
     dup1 __FUNC_SIG(totalSupply) sub __ERC721H__selectorSwitchContinue jumpi
-    TOTAL_SUPPLY()
+    __ERC721H__TOTAL_SUPPLY()
   __ERC721H__dataSafeTransferFrom:
     dup1 [SIG_DATA_SAFE_TRANSFER_FROM] sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__tokenURI:
