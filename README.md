@@ -19,3 +19,26 @@ Huff.
 - Excessively large, arbitrary `ERC721H__START_TOKEN_ID` values may lead to
   owner data storage slots colliding with other variables, leading to a suite of
   bugs / vulnerabilities
+
+## Progress
+
+### Progress - method implementation
+- [x] internal `name()` connection
+- [x] internal `symbol()` connection
+- [x] internal `tokenURI(uint256)` connection
+
+- [x] public totalSupply()
+- [ ] public transferFrom(address, address, uint256)
+- [ ] public safeTransferFrom(address, address, uint256)
+- [ ] public safeTransferFrom(address, address, uint256, bytes)
+- [ ] public getApproved(uint256)
+- [ ] public isApprovedForAll(address, address)
+- [ ] public approve(address, uint256)
+- [ ] public setApprovalForAll(address, bool)
+- [x] public ownerOf(uint256)
+- [x] public balanceOf(address)
+
+- [x] internal (no receive check) mint macro: `ERC721H__MINT`
+
+### Progress - testing
+TODO
