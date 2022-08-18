@@ -27,16 +27,16 @@ Huff.
 - [x] internal `symbol()` connection
 - [x] internal `tokenURI(uint256)` connection
 
-- [x] public totalSupply()
-- [ ] public transferFrom(address, address, uint256)
-- [ ] public safeTransferFrom(address, address, uint256)
-- [ ] public safeTransferFrom(address, address, uint256, bytes)
-- [ ] public getApproved(uint256)
-- [ ] public isApprovedForAll(address, address)
-- [ ] public approve(address, uint256)
-- [ ] public setApprovalForAll(address, bool)
-- [x] public ownerOf(uint256)
-- [x] public balanceOf(address)
+- [x] public `totalSupply()`
+- [ ] public `transferFrom(address, address, uint256)`
+- [ ] public `safeTransferFrom(address, address, uint256)`
+- [ ] public `safeTransferFrom(address, address, uint256, bytes)`
+- [ ] public `getApproved(uint256)`
+- [ ] public `isApprovedForAll(address, address)`
+- [ ] public `approve(address, uint256)`
+- [ ] public `setApprovalForAll(address, bool)`
+- [x] public `ownerOf(uint256)`
+- [x] public `balanceOf(address)`
 
 - [x] internal (no receive check) mint macro: `ERC721H__MINT`
 
