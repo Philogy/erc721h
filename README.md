@@ -39,6 +39,7 @@ Huff.
 - [x] public `balanceOf(address)`
 
 - [x] internal (no receive check) mint macro: `ERC721H__MINT`
+- [x] internal safe mint (with receive check) macro: `ERC721H__SAFE_MINT`
 
 ### Progress - testing
 TODO
