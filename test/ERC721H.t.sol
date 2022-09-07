@@ -8,7 +8,22 @@ import {ERC721} from "solmate/tokens/ERC721.sol";
 abstract contract MockERC721H is ERC721 {
     function mint(address, uint256) external virtual;
 
+    function safeMint(address, uint256) external virtual;
+
     function totalSupply() external view virtual returns (uint256);
+}
+
+interface IERC721Receiver {
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external returns (bytes4);
+}
+
+contract AnyDataAcceptor {
+    fallback() external {}
 }
 
 contract ERC721HTest is Test {
@@ -82,6 +97,47 @@ contract ERC721HTest is Test {
         emit Transfer(address(0), USER1, 7);
 
         token.mint(USER1, 3);
+
+        assertEq(token.balanceOf(USER1), 3, "user1 bal (2)");
+        assertEq(token.ownerOf(5), USER1, "user1 owns #5 (2)");
+        assertEq(token.ownerOf(6), USER1, "user1 owns #6 (2)");
+        assertEq(token.ownerOf(7), USER1, "user1 owns #7 (2)");
+        assertEq(token.balanceOf(USER2), 4, "user2 bal (2)");
+        assertEq(token.ownerOf(1), USER2, "user2 owns #1 (2)");
+        assertEq(token.ownerOf(2), USER2, "user2 owns #2 (2)");
+        assertEq(token.ownerOf(3), USER2, "user2 owns #3 (2)");
+        assertEq(token.ownerOf(4), USER2, "user2 owns #4 (2)");
+        assertEq(token.totalSupply(), 7, "total supply (2)");
+    }
+
+    function testSafeMint() public {
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(0), USER2, 1);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(0), USER2, 2);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(0), USER2, 3);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(0), USER2, 4);
+
+        token.safeMint(USER2, 4);
+
+        assertEq(token.balanceOf(USER1), 0, "user1 bal (1)");
+        assertEq(token.balanceOf(USER2), 4, "user2 bal (1)");
+        assertEq(token.ownerOf(1), USER2, "user2 owns #1 (1)");
+        assertEq(token.ownerOf(2), USER2, "user2 owns #2 (1)");
+        assertEq(token.ownerOf(3), USER2, "user2 owns #3 (1)");
+        assertEq(token.ownerOf(4), USER2, "user2 owns #4 (1)");
+        assertEq(token.totalSupply(), 4, "total supply (1)");
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(0), USER1, 5);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(0), USER1, 6);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(address(0), USER1, 7);
+
+        token.safeMint(USER1, 3);
 
         assertEq(token.balanceOf(USER1), 3, "user1 bal (2)");
         assertEq(token.ownerOf(5), USER1, "user1 owns #5 (2)");
