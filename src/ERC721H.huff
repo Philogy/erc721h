@@ -60,10 +60,11 @@
 #define constant ERC721H__NOT_CUR_INDEX_MASK = 0xffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000
 #define constant ERC721H_SLOT__GLOBAL_INDICES = FREE_STORAGE_POINTER()
 
-// _packedAddressData: mapping((account) => (aux, balance)) [keccak256(<slotConstant> . account)]
+// _packedAddressData: mapping((account) => (aux, balance)) [keccak256(<slotConstant> || account)]
 // _packedAddressData[].balance (size:  64, offset:  0) - how many tokens the address owns
 // _packedAddressData[].aux     (size: 196, offset: 64) - arbitrary auxillary data
-#define constant ERC721H_SLOT__PACKED_ADDRESS_DATA = FREE_STORAGE_POINTER()
+// Slot constant is onERC721Received selector to minimize necessary mstores
+#define constant ERC721H_SLOT__PACKED_ADDRESS_DATA = 0x150b7a02
 
 // slotConstant = keccak256("erc721h.storageLayout._packedOwnerships")
 // _packedOwnerships: mapping((tokenId) => (aux, burned, addr)) [<slotConstant> + tokenId]
@@ -206,6 +207,89 @@
   //                    [lastIndex, to, lastIndex]
 }
 
+
+#define error TransferToNonERC721ReceiverImplementer()
+#define error AttemptedSafeMintReentrancy()
+// TODO: take aux owner  token data
+/*
+ * @dev mints tokens doing the ERC721 recipient check with empty data
+ * @dev assumes memory[mem3] = 0; memory[mem5] = 0x80; memory[mem6] = 0
+*/
+#define macro ERC721H__SAFE_MINT(zero, mem1, mem1_1c, mem2, mem4) = takes (2) returns (3) {
+  // takes:             [to, quantity]
+
+  // -- check quantity > 0
+  __FUNC_SIG(MintZeroQuantity) dup3 REQUIRE(<zero>) pop
+  //                    [to, quantity]
+
+  // -- check address != 0
+  __FUNC_SIG(MintToZeroAddress) dup2 REQUIRE(<zero>) pop
+  //                    [to, quantity]
+
+  // -- update balance
+  [ERC721H_SLOT__PACKED_ADDRESS_DATA] <mem1> mstore
+  //                    [to, quantity]
+  dup1 <mem2> mstore // [to, quantity]
+  0x40 <mem1> sha3   // [address_data_slot, to, quantity]
+  dup1 sload         // [address_data, address_data_slot, to, quantity]
+  dup4 add           // [address_data', address_data_slot, to, quantity]
+  swap1 sstore       // [to, quantity]
+
+  // -- get and update current index (= first index in batch)
+  [ERC721H_SLOT__GLOBAL_INDICES]
+  //                    [glob_indices_slot, to, quantity]
+  dup1 sload         // [glob_indices, glob_indices_slot, to, quantity]
+  dup1 [MASK64] and
+  //                    [currentIndex, glob_indices, glob_indices_slot, to, quantity]
+  swap4 dup5 add     // [lastIndex_notMasked, glob_indices, glob_indices_slot, to, currentIndex]
+  [MASK64] and
+  //                    [lastIndex, glob_indices, glob_indices_slot, to, currentIndex]
+  dup1 swap2         // [glob_indices, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
+  [ERC721H__NOT_CUR_INDEX_MASK] and
+  //                    [global_indices \ currentIndex, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
+  or                 // [glob_indices', lastIndex, glob_indices_slot, to, currentIndex]
+  swap1 swap2        // [glob_indices_slot, glob_indices', lastIndex, to, currentIndex]
+  sstore             // [lastIndex, to, currentIndex]
+
+  // -- save owner of tokens
+  dup2               // [to, lastIndex, to, currentIndex]
+  dup4 [ERC721H_SLOT__OWNER_DATA] add
+  //                    [tokenSlot, to, lastIndex, to, currentIndex]
+  sstore             // [lastIndex, to, currentIndex]
+  swap2              // [currentIndex, to, lastIndex]
+
+  // -- prepare receive check data
+  caller <mem2> mstore // operator = msg.sender
+  //                    [currentIndex, to, lastIndex]
+
+  // -- emit transfer events
+  __ERC721__safeMintNextLoop:
+  //                    [curTokenId, to, lastIndex]
+    dup1 dup3 <zero> __EVENT_HASH(Transfer) <zero> <zero>
+    //                  [0, 0, Transfer.sig, 0, to, curTokenId, curTokenId, to, lastIndex]
+    log4             // [curTokenId, to, lastIndex]
+    __FUNC_SIG(TransferToNonERC721ReceiverImplementer)
+    dup1 <mem4> mstore
+    //                  [error_sig, curTokenId, to, lastIndex]
+    0x20 <mem1> 0xa4 <mem1_1c> <zero> dup8 gas call
+    //                  [suc, error_sig, curTokenId, to, lastIndex]
+    __FUNC_SIG(onERC721Received) <mem1> mload eq
+    //                  [ret == expec, suc, error_sig, curTokenId, to, lastIndex]
+    and REQUIRE(<zero>) pop
+    //                  [curTokenId, to, lastIndex]
+    0x1 add          // [curTokenId + 1, to, lastIndex]
+    dup3 dup2 sub    // [curTokenId + 1 != lastIndex, curTokenId + 1, to, lastIndex]
+    __ERC721__safeMintNextLoop jumpi
+  //                    [lastIndex, to, lastIndex]
+
+  // -- reentrancy protection
+  __FUNC_SIG(AttemptedSafeMintReentrancy) swap1
+  //                    [lastIndex, error_sig, to, lastIndex]
+  [ERC721H_SLOT__GLOBAL_INDICES] sload [MASK64] and
+  //                    [currentIndex, lastIndex, error_sig, to, lastIndex]
+  eq REQUIRE(<zero>) pop
+  //                    [to, lastIndex]
+}
 
 #define macro ERC721H_CONSTRUCTOR() = takes(0) returns(0) {
   [ERC721H__START_TOKEN_ID] [ERC721H_SLOT__GLOBAL_INDICES] sstore // _currentIndex = START_TOKEN_ID
