@@ -80,8 +80,6 @@
 // _tokenApprovals: mapping((tokenId) => (approvedAddr)) [keccak256(<slotConstant> . tokenId)]
 #define constant ERC721H_SLOT__TOKEN_APPROVALS = FREE_STORAGE_POINTER()
 
-
-
 /* View functions */
 #define macro __ERC721H__BALANCE_OF() = takes (0) returns (0) {
   NO_VALUE_CHECK(returndatasize)
@@ -101,6 +99,38 @@
   dup1 dup3 0x40 shr and               // [burnCounter, mask64, globalIndices, startTokenId]
   swap2 and                            // [currentIndex, burnCounter, startTokenId]
   sub sub                              // [totalSupply]
+  RETURN1(callvalue)
+}
+
+#define macro __ERC721H__SET_APPROVAL_FOR_ALL() = takes(0) returns(0) {
+  NO_VALUE_CHECK(returndatasize)
+  0x04 calldataload // [operator]
+  0x24 calldataload // [isApproved, operator]
+  dup1              // [isApproved, isApproved, operator]
+  // check if boolean
+  dup1 dup1 0x1 and // [isApproved & 1, isApproved, isApproved, isApproved, operator]
+  eq REQUIRE_NO_SIG(callvalue)
+  //                   [isApproved, isApproved, operator]
+  [ERC721H_SLOT__OPERATOR_APPROVALS] callvalue mstore
+  caller 0x20 mstore
+  dup3 0x40 mstore  // [isApproved, isApproved, operator]
+  0x60 callvalue sha3
+  //                   [_operatorApprovals.slot, isApproved, isApproved, operator]
+  sstore //            [isApproved, operator]
+  callvalue mstore //  [operator]
+  caller __EVENT_HASH(ApprovalForAll)
+  //                   [ApprovalForAll.sig, msg.sender, operator]
+  0x20 callvalue log3
+  stop
+}
+
+#define macro __ERC721H_IS_APPROVED_FOR_ALL() = takes(0) returns(0) {
+  NO_VALUE_CHECK(returndatasize)
+  [ERC721H_SLOT__OPERATOR_APPROVALS] callvalue mstore
+  0x04 calldataload 0x20 mstore
+  0x24 calldataload 0x40 mstore
+  0x60 callvalue sha3
+  sload
   RETURN1(callvalue)
 }
 
@@ -148,11 +178,26 @@
   RETURN1(callvalue)
 }
 
+#define macro __ERC721H__MINT_EVENT_LOOP(zero) = takes(3) returns(2) {
+  // takes: [curTokenId, to, lastIndex]
+
+  __ERC721__mintNextLoop:
+  //                    [curTokenId, to, lastIndex]
+    dup1 dup3 <zero> __EVENT_HASH(Transfer) <zero> <zero>
+    //                  [0, 0, Transfer.sig, 0, to, curTokenId, curTokenId, to, lastIndex]
+    log4             // [curTokenId, to, lastIndex]
+    0x1 add          // [curTokenId + 1, to, lastIndex]
+    dup3 dup2 sub    // [curTokenId + 1 != lastIndex, curTokenId + 1, to, lastIndex]
+    __ERC721__mintNextLoop jumpi
+  pop
+  //                    [to, lastIndex]
+}
+
 #define error MintZeroQuantity()
 #define error MintToZeroAddress()
 
 // TODO: take aux owner  token data
-#define macro ERC721H__MINT(zero, mem1, mem2) = takes(2) returns(3) {
+#define macro ERC721H__MINT(zero, mem1, mem2) = takes(2) returns(2) {
   // takes:             [to, quantity]
 
   // -- check quantity > 0
@@ -196,15 +241,9 @@
   swap2              // [currentIndex, to, lastIndex]
 
   // -- emit transfer events
-  __ERC721__mintNextLoop:
-  //                    [curTokenId, to, lastIndex]
-    dup1 dup3 <zero> __EVENT_HASH(Transfer) <zero> <zero>
-    //                  [0, 0, Transfer.sig, 0, to, curTokenId, curTokenId, to, lastIndex]
-    log4             // [curTokenId, to, lastIndex]
-    0x1 add          // [curTokenId + 1, to, lastIndex]
-    dup3 dup2 sub    // [curTokenId + 1 != lastIndex, curTokenId + 1, to, lastIndex]
-    __ERC721__mintNextLoop jumpi
-  //                    [lastIndex, to, lastIndex]
+  __ERC721H__MINT_EVENT_LOOP(<zero>)
+
+  //                    [to, lastIndex]
 }
 
 
@@ -262,32 +301,49 @@
   caller <mem2> mstore // operator = msg.sender
   //                    [currentIndex, to, lastIndex]
 
-  // -- emit transfer events
-  __ERC721__safeMintNextLoop:
+  // -- check whether receive check
+  dup2 extcodesize //   [to.codesize, curTokenId, to, lastIndex]
+  __ERC721H__safeMintReceiveCheckingLoop jumpi
   //                    [curTokenId, to, lastIndex]
-    dup1 dup3 <zero> __EVENT_HASH(Transfer) <zero> <zero>
-    //                  [0, 0, Transfer.sig, 0, to, curTokenId, curTokenId, to, lastIndex]
-    log4             // [curTokenId, to, lastIndex]
-    __FUNC_SIG(TransferToNonERC721ReceiverImplementer)
-    dup1 <mem4> mstore
-    //                  [error_sig, curTokenId, to, lastIndex]
-    0x20 <mem1> 0xa4 <mem1_1c> <zero> dup8 gas call
-    //                  [suc, error_sig, curTokenId, to, lastIndex]
-    __FUNC_SIG(onERC721Received) <mem1> mload eq
-    //                  [ret == expec, suc, error_sig, curTokenId, to, lastIndex]
-    and REQUIRE(<zero>) pop
-    //                  [curTokenId, to, lastIndex]
-    0x1 add          // [curTokenId + 1, to, lastIndex]
-    dup3 dup2 sub    // [curTokenId + 1 != lastIndex, curTokenId + 1, to, lastIndex]
-    __ERC721__safeMintNextLoop jumpi
-  //                    [lastIndex, to, lastIndex]
 
-  // -- reentrancy protection
-  __FUNC_SIG(AttemptedSafeMintReentrancy) swap1
-  //                    [lastIndex, error_sig, to, lastIndex]
-  [ERC721H_SLOT__GLOBAL_INDICES] sload [MASK64] and
-  //                    [currentIndex, lastIndex, error_sig, to, lastIndex]
-  eq REQUIRE(<zero>) pop
+    __ERC721H__MINT_EVENT_LOOP(<zero>)
+    //                  [to, lastIndex]
+  __ERC721H__safeMintContinue jump
+  __ERC721H__safeMintReceiveCheckingLoop:
+
+    __ERC721H__safeMintNextLoop:
+    //                  [curTokenId, to, lastIndex]
+      dup1 dup3 <zero> __EVENT_HASH(Transfer) <zero> <zero>
+      //                [0, 0, Transfer.sig, 0, to, curTokenId, curTokenId, to, lastIndex]
+      log4 //           [curTokenId, to, lastIndex]
+
+      // __FUNC_SIG(TransferToNonERC721ReceiverImplementer())
+      0xd1a57ed6 // push correct sig while bug
+      dup2 <mem4> mstore
+      //                [error_sig, curTokenId, to, lastIndex]
+      0x04 <mem1_1c> 0xa4 <mem1_1c> <zero> dup8 gas call
+      //                [suc, error_sig, curTokenId, to, lastIndex]
+      __FUNC_SIG(onERC721Received)
+      //                [onERC721Received.sig, suc, error_sig, curTokenId, to, lastIndex]
+      <mem1> mload eq
+      //                [ret == expec, suc, error_sig, curTokenId, to, lastIndex]
+      and REQUIRE(<zero>) pop
+
+      //                [curTokenId, to, lastIndex]
+      0x1 add //        [curTokenId + 1, to, lastIndex]
+      dup3 dup2 sub //  [curTokenId + 1 != lastIndex, curTokenId + 1, to, lastIndex]
+    __ERC721H__safeMintNextLoop jumpi
+    //                  [lastIndex, to, lastIndex]
+
+    // -- reentrancy protection
+    __FUNC_SIG(AttemptedSafeMintReentrancy) swap1
+    //                  [lastIndex, error_sig, to, lastIndex]
+    [ERC721H_SLOT__GLOBAL_INDICES] sload [MASK64] and
+    //                  [currentIndex, lastIndex, error_sig, to, lastIndex]
+    eq REQUIRE(<zero>) pop
+    //                  [to, lastIndex]
+
+  __ERC721H__safeMintContinue:
   //                    [to, lastIndex]
 }
 
@@ -366,6 +422,7 @@
     dup1 __FUNC_SIG(approve) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__setApprovalForAll:
     dup1 __FUNC_SIG(setApprovalForAll) sub __ERC721H__selectorSwitchContinue jumpi
+    __ERC721H__SET_APPROVAL_FOR_ALL()
   __ERC721H__supportsInterface:
     dup1 __FUNC_SIG(supportsInterface) sub __ERC721H__selectorSwitchContinue jumpi
   __ERC721H__name:
@@ -373,6 +430,7 @@
     <name> jump
   __ERC721H__isApprovedForAll:
     dup1 __FUNC_SIG(isApprovedForAll) sub __ERC721H__selectorSwitchContinue jumpi
+    __ERC721H_IS_APPROVED_FOR_ALL()
 
   __ERC721H__selectorSwitchContinue:
 }

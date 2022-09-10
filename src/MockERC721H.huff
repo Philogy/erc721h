@@ -12,7 +12,7 @@
   0x24 calldataload  // [quantity]
   0x04 calldataload  // [to, quantity]
   ERC721H__MINT(callvalue, callvalue, 0x20)
-  callvalue RETURN1(callvalue)
+  stop
 }
 
 #define macro SAFE_MINT() = takes(0) returns(0) {
@@ -21,7 +21,7 @@
   0x04 calldataload  // [to, quantity]
   0x80 0x80 mstore   // [to, quantity]
   ERC721H__SAFE_MINT(callvalue, callvalue, 0x1c, 0x20, 0x60)
-  callvalue RETURN1(callvalue)
+  stop
 }
 
 #define macro EMPTY_STRING() = takes(0) returns(0) {

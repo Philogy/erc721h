@@ -6,6 +6,15 @@
   0x04 0x1c revert // []
 }
 
+#define macro REVERT_SIG_LOC() = takes(2) returns(0) {
+  // takes:   [0, error_sig]
+  __Utils_Misc__revertSig:
+    mstore // []
+    0x04 0x1c revert
+}
+
+
+
 
 /* the remaining error sig is explicitly not popped, can be useful if chaining
  * multiple conditions into an AND-type conditional statement
@@ -23,6 +32,14 @@
   REVERT_SIG(<zero>)
   __Utils_Misc__requireContinue:      // [error_sig]
 }
+
+#define macro REQUIRE_NO_SIG(zero) = takes(1) returns(0) {
+  // takes: [condition]
+  __Utils_Misc__requireNoSigContinue jumpi
+  <zero> <zero> revert
+  __Utils_Misc__requireNoSigContinue:
+}
+
 
 /// @dev underflow safe subtraction with custom error (4-byte error sig only, no args)
 #define macro SAFE_SUB(zero) = takes(3) returns(1) {

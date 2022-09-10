@@ -4,6 +4,8 @@ pragma solidity ^0.8.13;
 import {Test} from "forge-std/Test.sol";
 import {HuffDeployer} from "foundry-huff/HuffDeployer.sol";
 import {ERC721} from "solmate/tokens/ERC721.sol";
+import {IERC721H} from "../src/IERC721H.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 abstract contract MockERC721H is ERC721 {
     function mint(address, uint256) external virtual;
@@ -13,23 +15,61 @@ abstract contract MockERC721H is ERC721 {
     function totalSupply() external view virtual returns (uint256);
 }
 
-interface IERC721Receiver {
-    function onERC721Received(
-        address operator,
-        address from,
-        uint256 tokenId,
-        bytes calldata data
-    ) external returns (bytes4);
-}
-
 contract AnyDataAcceptor {
     fallback() external {}
 }
 
+contract ERC721NotAcceptor1 is IERC721Receiver {
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external returns (bytes4) {
+        revert("");
+    }
+}
+
+contract ERC721NotAcceptor2 {}
+
+struct Receive {
+    address operator;
+    address from;
+    uint256 tokenId;
+    bytes data;
+    uint256 totalCalldataSize;
+}
+
+contract ERC721Acceptor is IERC721Receiver {
+    Receive[] public receives;
+
+    function totalReceives() external view returns (uint256) {
+        return receives.length;
+    }
+
+    function onERC721Received(
+        address _operator,
+        address _from,
+        uint256 _tokenId,
+        bytes calldata _data
+    ) external returns (bytes4) {
+        receives.push(
+            Receive({
+                operator: _operator,
+                from: _from,
+                tokenId: _tokenId,
+                data: _data,
+                totalCalldataSize: msg.data.length
+            })
+        );
+        return IERC721Receiver.onERC721Received.selector;
+    }
+}
+
 contract ERC721HTest is Test {
-    address constant USER1 = address(uint160(1000));
-    address constant USER2 = address(uint160(2000));
-    address constant USER3 = address(uint160(3000));
+    address constant USER1 = address(bytes20(keccak256("user1")));
+    address constant USER2 = address(bytes20(keccak256("user2")));
+    address constant USER3 = address(bytes20(keccak256("user3")));
     MockERC721H internal token;
 
     event Transfer(address indexed, address indexed, uint256 indexed);
@@ -50,10 +90,12 @@ contract ERC721HTest is Test {
 
     function testDoesNotAcceptCallValue() public {
         vm.deal(msg.sender, 1 ether);
+
         vm.expectRevert();
         address(token).call{value: 1 wei}(
             abi.encodeCall(token.totalSupply, ())
         );
+
         vm.expectRevert();
         address(token).call{value: 1 wei}(
             abi.encodeCall(token.balanceOf, (USER1))
@@ -66,6 +108,16 @@ contract ERC721HTest is Test {
         vm.expectRevert();
         address(token).call{value: 1 wei}(
             abi.encodeCall(token.ownerOf, (tokenId))
+        );
+
+        vm.expectRevert();
+        address(token).call{value: 1 wei}(
+            abi.encodeCall(token.isApprovedForAll, (USER1, USER2))
+        );
+
+        vm.expectRevert();
+        address(token).call{value: 1 wei}(
+            abi.encodeCall(token.setApprovalForAll, (USER1, true))
         );
     }
 
@@ -110,7 +162,7 @@ contract ERC721HTest is Test {
         assertEq(token.totalSupply(), 7, "total supply (2)");
     }
 
-    function testSafeMint() public {
+    function testSafeMintToEOA() public {
         vm.expectEmit(true, true, true, true);
         emit Transfer(address(0), USER2, 1);
         vm.expectEmit(true, true, true, true);
@@ -151,8 +203,89 @@ contract ERC721HTest is Test {
         assertEq(token.totalSupply(), 7, "total supply (2)");
     }
 
-    function runTestInitialState() public {
+    function testSafeMintRevertsNoReceive() public {
+        address recipient1 = address(new ERC721NotAcceptor1());
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        token.safeMint(recipient1, 4);
+
+        address recipient2 = address(new ERC721NotAcceptor2());
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        token.safeMint(recipient2, 3);
+    }
+
+    function testSafeMintToReceiver() public {
+        ERC721Acceptor acceptor = new ERC721Acceptor();
+
+        for (uint256 i = 1; i <= 3; i++) {
+            vm.expectEmit(true, true, true, true);
+            emit Transfer(address(0), address(acceptor), i);
+        }
+
+        vm.prank(USER1);
+        token.safeMint(address(acceptor), 3);
+
+        for (uint256 i = 1; i <= 3; i++) {
+            assertEq(token.ownerOf(i), address(acceptor), "owner");
+            (
+                address operator,
+                address from,
+                uint256 tokenId,
+                bytes memory data,
+                uint256 totalCalldataSize
+            ) = acceptor.receives(i - 1);
+            assertEq(operator, USER1, "operator");
+            assertEq(from, address(0), "from");
+            assertEq(tokenId, i, "tokenId");
+            assertEq(data, "", "data");
+            assertEq(totalCalldataSize, 4 + 0x20 * 5);
+        }
+        assertEq(token.balanceOf(address(acceptor)), 3);
+        assertEq(token.totalSupply(), 3);
+        assertEq(acceptor.totalReceives(), 3);
+    }
+
+    function testApprovalForAll() public {
+        assertEq(token.isApprovedForAll(USER1, USER2), false);
+        assertEq(token.isApprovedForAll(USER2, USER1), false);
+
+        vm.expectEmit(true, true, false, true);
+        emit ApprovalForAll(USER1, USER2, true);
+
+        vm.prank(USER1);
+        token.setApprovalForAll(USER2, true);
+        assertEq(token.isApprovedForAll(USER1, USER2), true);
+        assertEq(token.isApprovedForAll(USER2, USER1), false);
+
+        vm.expectEmit(true, true, false, true);
+        emit ApprovalForAll(USER1, USER2, false);
+
+        vm.prank(USER1);
+        token.setApprovalForAll(USER2, false);
+        assertEq(token.isApprovedForAll(USER1, USER2), false);
+        assertEq(token.isApprovedForAll(USER2, USER1), false);
+
+        vm.expectEmit(true, true, false, true);
+        emit ApprovalForAll(USER2, USER3, false);
+        vm.prank(USER2);
+        token.setApprovalForAll(USER3, false);
+
+        vm.expectRevert();
+        vm.prank(USER1);
+        address(token).call(
+            abi.encodeWithSelector(
+                token.setApprovalForAll.selector,
+                USER2,
+                uint256(2)
+            )
+        );
+    }
+
+    function runDebug() public {
         setUp();
-        testInitialState();
+        testApprovalForAll();
     }
 }
