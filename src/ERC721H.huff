@@ -67,7 +67,7 @@
 #define constant ERC721H_SLOT__PACKED_ADDRESS_DATA = 0x150b7a02
 
 // slotConstant = keccak256("erc721h.storageLayout._packedOwnerships")
-// _packedOwnerships: mapping((tokenId) => (aux, burned, addr)) [<slotConstant> + tokenId]
+// _packedOwnerships: mapping((token_id) => (aux, burned, addr)) [<slotConstant> + token_id]
 // _packedOwnerships[].addr   (size: 160, offset:   0) - owner / 0 if minted in batch
 // _packedOwnerships[].burned (size:   1, offset: 160) - if token was already burnt
 // _packedOwnerships[].aux    (size:  95, offset: 161) - arbitrary auxillary data
@@ -77,8 +77,9 @@
 // _operatorApprovals: mapping((owner, operator) => (isApproved)) [keccak256(<slotConstant> . owner . operator)]
 #define constant ERC721H_SLOT__OPERATOR_APPROVALS = FREE_STORAGE_POINTER()
 
-// _tokenApprovals: mapping((tokenId) => (approvedAddr)) [keccak256(<slotConstant> . tokenId)]
-#define constant ERC721H_SLOT__TOKEN_APPROVALS = FREE_STORAGE_POINTER()
+// slotConstant = keccak256("erc721h.storageLayout._tokenApprovals")
+// _tokenApprovals: mapping((token_id) => (approvedAddr)) [<slotConstant> + token_id]
+#define constant ERC721H_SLOT__TOKEN_APPROVALS = 0x62b148735602bc106b11fdd0c804fa886d55bf94ee772f275741dfa7c159ab42
 
 /* View functions */
 #define macro __ERC721H__BALANCE_OF() = takes (0) returns (0) {
@@ -124,7 +125,7 @@
   stop
 }
 
-#define macro __ERC721H_IS_APPROVED_FOR_ALL() = takes(0) returns(0) {
+#define macro __ERC721H__IS_APPROVED_FOR_ALL() = takes(0) returns(0) {
   NO_VALUE_CHECK(returndatasize)
   [ERC721H_SLOT__OPERATOR_APPROVALS] callvalue mstore
   0x04 calldataload 0x20 mstore
@@ -136,20 +137,7 @@
 
 #define error OwnerQueryForNonexistentToken()
 
-#define macro ERC721H__TOKEN_ID_EXISTS(zero) = takes(1) returns(1) {
-  // takes:                         [tokenId]
-
-  __FUNC_SIG(OwnerQueryForNonexistentToken)
-  //                                [error_sig, tokenId]
-  [ERC721H__START_TOKEN_ID] dup3 // [tokenId, startTokenId, error_sig, tokenId]
-  lt iszero REQUIRE(<zero>)      // [error_sig, tokenId]
-  [ERC721H_SLOT__GLOBAL_INDICES] sload
-  //                                [glob_indices, error_sig, tokenId]
-  [MASK64] and                   // [currentIndex, error_sig, tokenId]
-  dup3 lt REQUIRE(<zero>) pop    // [tokenId]
-}
-
-#define macro ERC721H__GET_OWNER_DATA_FOR() = takes(1) returns(2) {
+#define macro ERC721H__GET_PACKED_OWNERSHIP() = takes(1) returns(2) {
   // takes:     [initial_owner_data_slot]
   dup1 sload // [owner_data, initial_owner_data_slot]
   dup1 __ERC721H__getOwnerDataEnd jumpi
@@ -161,34 +149,87 @@
   dup1 iszero __ERC721H__getOwnerDataContinue jumpi
 
   __ERC721H__getOwnerDataEnd:
-  //            [owner_data, orig_data_slot]
+  //            [owner_data, owner_data_slot]
+}
+
+#define macro ERC721H__GET_PACKED_OWNERSHIP_SAFE(zero) = takes(1) returns(2) {
+  // takes:                         [token_id]
+
+  __FUNC_SIG(OwnerQueryForNonexistentToken)
+  //                                [error_sig, token_id]
+  [ERC721H__START_TOKEN_ID] dup3 // [token_id, startTokenId, error_sig, token_id]
+  lt iszero REQUIRE(<zero>)      // [error_sig, token_id]
+  [ERC721H_SLOT__GLOBAL_INDICES] sload
+  //                                [glob_indices, error_sig, token_id]
+  [MASK64] and                   // [currentIndex, error_sig, token_id]
+  dup3 lt REQUIRE(<zero>) pop    // [token_id]
+  [ERC721H_SLOT__OWNER_DATA] add // [direct_owner_data_slot]
+  ERC721H__GET_PACKED_OWNERSHIP()
+  //                                [owner_data, owner_data_slot]
+  __FUNC_SIG(OwnerQueryForNonexistentToken)
+  //                                [error_sig, owner_data, owner_data_slot]
+  dup2 [ERC721H__BURNED_MASK] and
+  //                                [burned_flag << 160, error_sig, owner_data, owner_data_slot]
+  iszero REQUIRE(<zero>)         // [error_sig, owner_data, owner_data_slot]
+  pop                            // [owner_data, owner_data_slot]
+
+  // returns:                       [owner_data, owner_data_slot]
 }
 
 #define macro __ERC721H__OWNER_OF() = takes(0) returns(0) {
   NO_VALUE_CHECK(returndatasize)
-  0x4 calldataload                    // [tokenId]
-  ERC721H__TOKEN_ID_EXISTS(callvalue) // [tokenId]
-  [ERC721H_SLOT__OWNER_DATA] add      // [initial_owner_data_slot]
-  ERC721H__GET_OWNER_DATA_FOR()       // [owner_data, orig_data_slot]
-  __FUNC_SIG(OwnerQueryForNonexistentToken)
-  //                                     [error_sig, owner_data, orig_data_slot]
-  dup2 [ERC721H__BURNED_MASK] and     // [burned_flag << 160, error_sig, owner_data, orig_data_slot]
-  iszero REQUIRE(callvalue) pop       // [owner_data, orig_data_slot]
+  0x4 calldataload                    // [token_id]
+  ERC721H__GET_PACKED_OWNERSHIP_SAFE(callvalue)
   [MASK_ADDR] and                     // [owner, orig_data_slot]
   RETURN1(callvalue)
+}
+
+#define error ApprovalCallerNotOwnerNorApproved()
+
+#define macro __ERC721H__APPROVE() = takes(0) returns(0) {
+  NO_VALUE_CHECK(returndatasize)
+  0x24 calldataload dup1    // [token_id, token_id]
+  ERC721H__GET_PACKED_OWNERSHIP_SAFE(callvalue)
+  //                           [owner_data, owner_data_slot, token_id]
+  [MASK_ADDR] and           // [owner, owner_data_slot, token_id]
+  dup1 caller eq            // [owner == msg.sender, owner, owner_data_slot, token_id]
+  __ERC721H__approveAuthConfirm jumpi
+    //                         [owner, owner_data_slot, token_id]
+    [ERC721H_SLOT__OPERATOR_APPROVALS] callvalue mstore
+    //                         [owner, owner_data_slot, token_id]
+    dup1 0x20 mstore        // [owner, owner_data_slot, token_id]
+    caller 0x40 mstore      // [owner, owner_data_slot, token_id]
+    caller 0x40 mstore      // [owner, owner_data_slot, token_id]
+    0x60 callvalue sha3     // [approved_for_all_slot, owner, owner_data_slot, token_id]
+    sload                   // [approved_for_all, owner, owner_data_slot, token_id]
+  __ERC721H__approveAuthConfirm jumpi
+    __FUNC_SIG(ApprovalCallerNotOwnerNorApproved)
+    REVERT_SIG(callvalue)
+  __ERC721H__approveAuthConfirm:
+    //                         [owner, owner_data_slot, token_id]
+  0x04 calldataload swap1   // [owner, to, owner_data_slot, token_id]
+  dup2                      // [to, owner, to, owner_data_slot, token_id]
+  dup5 swap2                // [owner, to, token_id, to, owner_data_slot, token_id]
+  __EVENT_HASH(Approval)    // [Approval.sig, owner, to, token_id, to, owner_data_slot, token_id]
+  callvalue callvalue log4  // [to, owner_data_slot, token_id]
+  swap1 swap2               // [token_id, to, owner_data_slot]
+  [ERC721H_SLOT__TOKEN_APPROVALS] add
+  //                           [approval_slot, to, owner_data_slot]
+  sstore
+  stop
 }
 
 #define macro __ERC721H__MINT_EVENT_LOOP(zero) = takes(3) returns(2) {
   // takes: [curTokenId, to, lastIndex]
 
-  __ERC721__mintNextLoop:
+  __ERC721H__mintNextLoop:
   //                    [curTokenId, to, lastIndex]
     dup1 dup3 <zero> __EVENT_HASH(Transfer) <zero> <zero>
     //                  [0, 0, Transfer.sig, 0, to, curTokenId, curTokenId, to, lastIndex]
     log4             // [curTokenId, to, lastIndex]
     0x1 add          // [curTokenId + 1, to, lastIndex]
     dup3 dup2 sub    // [curTokenId + 1 != lastIndex, curTokenId + 1, to, lastIndex]
-    __ERC721__mintNextLoop jumpi
+    __ERC721H__mintNextLoop jumpi
   pop
   //                    [to, lastIndex]
 }
@@ -382,9 +423,9 @@
   //                [selector]
   0x20           // [0x20, selector]
   // needs to be multiplied by 32 (<< 5) for table offset
-  // >> 12; << 5; simplifies to >> 5
-  dup2 0x7 shr   // [selector >> 5, 0x20 selector]
-  // 4-bit mask shift left 5 to meet selector
+  // >> 12; << 5; simplifies to >> 7
+  dup2 0x7 shr   // [selector >> 7, 0x20 selector]
+  // 4-bit mask shift left 7 to meet selector
   0x1e0 and      // [table_offset, 0x20, selector]
   __tablestart(__ERC721H__SELECTOR_TABLE) add
   //                [code_offset, 0x20, selector]
@@ -420,6 +461,7 @@
     <symbol> jump
   __ERC721H__approve:
     dup1 __FUNC_SIG(approve) sub __ERC721H__selectorSwitchContinue jumpi
+    __ERC721H__APPROVE()
   __ERC721H__setApprovalForAll:
     dup1 __FUNC_SIG(setApprovalForAll) sub __ERC721H__selectorSwitchContinue jumpi
     __ERC721H__SET_APPROVAL_FOR_ALL()
@@ -430,7 +472,7 @@
     <name> jump
   __ERC721H__isApprovedForAll:
     dup1 __FUNC_SIG(isApprovedForAll) sub __ERC721H__selectorSwitchContinue jumpi
-    __ERC721H_IS_APPROVED_FOR_ALL()
+    __ERC721H__IS_APPROVED_FOR_ALL()
 
   __ERC721H__selectorSwitchContinue:
 }
