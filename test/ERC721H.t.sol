@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
@@ -118,6 +118,16 @@ contract ERC721HTest is Test {
         vm.expectRevert();
         address(token).call{value: 1 wei}(
             abi.encodeCall(token.setApprovalForAll, (USER1, true))
+        );
+
+        vm.expectRevert();
+        address(token).call{value: 1 wei}(
+            abi.encodeCall(token.approve, (USER1, 1))
+        );
+
+        vm.expectRevert();
+        address(token).call{value: 1 wei}(
+            abi.encodeCall(token.getApproved, (1))
         );
     }
 
@@ -284,8 +294,16 @@ contract ERC721HTest is Test {
         );
     }
 
+    function testTokenApproval() public {
+        token.mint(USER1, 3);
+
+        assertEq(token.getApproved(1), address(0));
+    }
+
     function runDebug() public {
         setUp();
-        testApprovalForAll();
+        token.safeMint(USER1, 2);
+        address owner = token.ownerOf(1);
+        emit log_named_address("owner", owner);
     }
 }
