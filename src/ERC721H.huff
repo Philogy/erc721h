@@ -1,6 +1,5 @@
 /// @title ERC721A
-/// @author Philogy
-/// @author bmwoolf
+/// @author Philogy <philippe@dumo.net>
 /// @notice A reusable base implementation of the ERC721A token contract written in Huff
 
 /* Imports */
@@ -50,7 +49,6 @@
 
 /* Storage Layout */
 #define constant MASK64 = 0xffffffffffffffff
-#define constant MASK_ADDR = 0xffffffffffffffffffffffffffffffffffffffff
 #define constant NEG1 = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 
@@ -85,7 +83,10 @@
 #define macro __ERC721H__BALANCE_OF() = takes (0) returns (0) {
   NO_VALUE_CHECK(returndatasize)
   [ERC721H_SLOT__PACKED_ADDRESS_DATA] callvalue mstore
-  0x04 calldataload 0x20 mstore
+  0x04 calldataload   // [account]
+  dup1 REQUIRE_ADDR(callvalue)
+  //                     [account]
+  0x20 mstore         // []
   0x40 callvalue sha3 // [address_data_slot]
   sload               // [address_data]
   [MASK64] and        // [balance]
@@ -106,6 +107,8 @@
 #define macro __ERC721H__SET_APPROVAL_FOR_ALL() = takes(0) returns(0) {
   NO_VALUE_CHECK(returndatasize)
   0x04 calldataload // [operator]
+  dup1 REQUIRE_ADDR(callvalue)
+  //                   [operator]
   0x24 calldataload // [isApproved, operator]
   dup1              // [isApproved, isApproved, operator]
   // check if boolean
@@ -128,10 +131,13 @@
 #define macro __ERC721H__IS_APPROVED_FOR_ALL() = takes(0) returns(0) {
   NO_VALUE_CHECK(returndatasize)
   [ERC721H_SLOT__OPERATOR_APPROVALS] callvalue mstore
-  0x04 calldataload 0x20 mstore
-  0x24 calldataload 0x40 mstore
-  0x60 callvalue sha3
-  sload
+  0x04 calldataload            // [owner]
+  dup1 REQUIRE_ADDR(callvalue) // [owner]
+  0x24 calldataload            // [operator, owner]
+  dup1 REQUIRE_ADDR(callvalue) // [operator, owner]
+  0x40 mstore                  // [owner]
+  0x20 mstore                  // []
+  0x60 callvalue sha3 sload    // [approval]
   RETURN1(callvalue)
 }
 
@@ -155,7 +161,8 @@
 #define macro ERC721H__GET_PACKED_OWNERSHIP_SAFE(zero) = takes(1) returns(2) {
   // takes:                         [token_id]
 
-  __FUNC_SIG(OwnerQueryForNonexistentToken)
+  // TODO: Replace once compiler fixed
+  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
   //                                [error_sig, token_id]
   [ERC721H__START_TOKEN_ID] dup3 // [token_id, startTokenId, error_sig, token_id]
   lt iszero REQUIRE(<zero>)      // [error_sig, token_id]
@@ -166,7 +173,8 @@
   [ERC721H_SLOT__OWNER_DATA] add // [direct_owner_data_slot]
   ERC721H__GET_PACKED_OWNERSHIP()
   //                                [owner_data, owner_data_slot]
-  __FUNC_SIG(OwnerQueryForNonexistentToken)
+  // TODO: Replace once compiler fixed
+  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
   //                                [error_sig, owner_data, owner_data_slot]
   dup2 [ERC721H__BURNED_MASK] and
   //                                [burned_flag << 160, error_sig, owner_data, owner_data_slot]
@@ -203,12 +211,15 @@
     0x60 callvalue sha3     // [approved_for_all_slot, owner, owner_data_slot, token_id]
     sload                   // [approved_for_all, owner, owner_data_slot, token_id]
   __ERC721H__approveAuthConfirm jumpi
-    __FUNC_SIG(ApprovalCallerNotOwnerNorApproved)
+    // TODO: Replace once compiler fixed
+    0xcfb3b942 // __FUNC_SIG(ApprovalCallerNotOwnerNorApproved)
     REVERT_SIG(callvalue)
   __ERC721H__approveAuthConfirm:
     //                         [owner, owner_data_slot, token_id]
-  0x04 calldataload swap1   // [owner, to, owner_data_slot, token_id]
-  dup2                      // [to, owner, to, owner_data_slot, token_id]
+  0x04 calldataload         // [to, owner, owner_data_slot, token_id]
+  dup1 REQUIRE_ADDR(callvalue)
+  //                           [to, owner, owner_data_slot, token_id]
+  swap1 dup2                // [to, owner, to, owner_data_slot, token_id]
   dup5 swap2                // [owner, to, token_id, to, owner_data_slot, token_id]
   __EVENT_HASH(Approval)    // [Approval.sig, owner, to, token_id, to, owner_data_slot, token_id]
   callvalue callvalue log4  // [to, owner_data_slot, token_id]
@@ -217,6 +228,31 @@
   //                           [approval_slot, to, owner_data_slot]
   sstore
   stop
+}
+
+#define error ApprovalQueryForNonexistentToken()
+
+#define macro __ERC721H__IS_APPROVED() = takes(0) returns(0) {
+  NO_VALUE_CHECK(returndatasize)
+
+  0x04 calldataload              // [token_id]
+  // __FUNC_SIG(ApprovalQueryForNonexistentToken)
+  0xcf4700e4
+  //                                [error_sig, token_id]
+  [ERC721H__START_TOKEN_ID] dup3 // [token_id, startTokenId, error_sig, token_id]
+  lt iszero REQUIRE(callvalue)      // [error_sig, token_id]
+  [ERC721H_SLOT__GLOBAL_INDICES] sload
+  //                                [glob_indices, error_sig, token_id]
+  [MASK64] and                   // [currentIndex, error_sig, token_id]
+  dup3 lt REQUIRE(callvalue)        // [error_sig, token_id]
+  [ERC721H_SLOT__OWNER_DATA]     // [owner_data_slot_offset, error_sig, token_id]
+  dup3 add sload                 // [direct_token_owner_data, error_sig, token_id]
+  [ERC721H__BURNED_MASK] and     // [burned_flag << 160, error_sig, token_id]
+  iszero REQUIRE(callvalue) pop     // [token_id]
+
+  [ERC721H_SLOT__TOKEN_APPROVALS] add
+  //                                [token_approval_slot]
+  sload RETURN1(callvalue)
 }
 
 #define macro __ERC721H__MINT_EVENT_LOOP(zero) = takes(3) returns(2) {
@@ -440,6 +476,7 @@
   // switch to be used with more methods
   __ERC721H__getApproved:
     dup1 __FUNC_SIG(getApproved) sub __ERC721H__selectorSwitchContinue jumpi
+    __ERC721H__IS_APPROVED()
   __ERC721H__ownerOf:
     dup1 __FUNC_SIG(ownerOf) sub __ERC721H__selectorSwitchContinue jumpi
     __ERC721H__OWNER_OF()

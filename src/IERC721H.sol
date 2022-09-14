@@ -10,4 +10,6 @@ interface IERC721H is IERC721 {
     error MintToZeroAddress();
     error TransferToNonERC721ReceiverImplementer();
     error AttemptedSafeMintReentrancy();
+    error ApprovalQueryForNonexistentToken();
+    error ApprovalCallerNotOwnerNorApproved();
 }

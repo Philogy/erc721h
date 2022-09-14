@@ -31,15 +31,16 @@ Huff.
 - [ ] public `transferFrom(address, address, uint256)`
 - [ ] public `safeTransferFrom(address, address, uint256)`
 - [ ] public `safeTransferFrom(address, address, uint256, bytes)`
-- [ ] public `getApproved(uint256)`
+- [x] public `getApproved(uint256)`
 - [x] public `isApprovedForAll(address, address)`
-- [ ] public `approve(address, uint256)`
+- [x] public `approve(address, uint256)`
 - [x] public `setApprovalForAll(address, bool)`
 - [x] public `ownerOf(uint256)`
 - [x] public `balanceOf(address)`
 
 - [x] internal (no receive check) mint macro: `ERC721H__MINT`
 - [x] internal safe mint (with receive check) macro: `ERC721H__SAFE_MINT`
+- [ ] internal burn macro: `ERC721H__BURN`
 
 ### Progress - testing
 TODO

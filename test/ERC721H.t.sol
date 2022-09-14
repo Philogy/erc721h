@@ -70,6 +70,7 @@ contract ERC721HTest is Test {
     address constant USER1 = address(bytes20(keccak256("user1")));
     address constant USER2 = address(bytes20(keccak256("user2")));
     address constant USER3 = address(bytes20(keccak256("user3")));
+    address constant ATTACKER1 = address(bytes20(keccak256("attacker1")));
     MockERC721H internal token;
 
     event Transfer(address indexed, address indexed, uint256 indexed);
@@ -294,16 +295,57 @@ contract ERC721HTest is Test {
         );
     }
 
-    function testTokenApproval() public {
+    function testDirectTokenApproval() public {
+        vm.expectRevert(IERC721H.ApprovalQueryForNonexistentToken.selector);
+        token.getApproved(0);
+        vm.expectRevert(IERC721H.ApprovalQueryForNonexistentToken.selector);
+        token.getApproved(2);
+
         token.mint(USER1, 3);
 
+        vm.expectRevert(IERC721H.ApprovalQueryForNonexistentToken.selector);
+        token.getApproved(4);
+
         assertEq(token.getApproved(1), address(0));
+
+        vm.expectRevert(IERC721H.ApprovalCallerNotOwnerNorApproved.selector);
+        vm.prank(ATTACKER1);
+        token.approve(ATTACKER1, 1);
+
+        vm.expectEmit(true, true, true, false);
+        emit Approval(USER1, USER2, 1);
+        vm.prank(USER1);
+        token.approve(USER2, 1);
+        assertEq(token.getApproved(1), USER2);
+
+        vm.expectRevert(IERC721H.OwnerQueryForNonexistentToken.selector);
+        vm.prank(USER1);
+        token.approve(USER2, 4);
+
+        token.mint(USER2, 4);
+
+        vm.expectEmit(true, true, true, false);
+        emit Approval(USER2, USER3, 4);
+        vm.prank(USER2);
+        token.approve(USER3, 4);
+        assertEq(token.getApproved(4), USER3);
+    }
+
+    function testOperatorForAllSetTokenApproval() public {
+        token.mint(USER1, 4);
+
+        vm.prank(USER1);
+        token.setApprovalForAll(USER2, true);
+
+        vm.prank(USER2);
+        vm.expectEmit(true, true, true, false);
+        emit Approval(USER1, USER3, 2);
+        token.approve(USER3, 2);
+        assertEq(token.getApproved(2), USER3);
     }
 
     function runDebug() public {
         setUp();
-        token.safeMint(USER1, 2);
-        address owner = token.ownerOf(1);
-        emit log_named_address("owner", owner);
+        testDirectTokenApproval();
     }
 }

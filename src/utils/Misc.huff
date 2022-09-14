@@ -6,16 +6,6 @@
   0x04 0x1c revert // []
 }
 
-#define macro REVERT_SIG_LOC() = takes(2) returns(0) {
-  // takes:   [0, error_sig]
-  __Utils_Misc__revertSig:
-    mstore // []
-    0x04 0x1c revert
-}
-
-
-
-
 /* the remaining error sig is explicitly not popped, can be useful if chaining
  * multiple conditions into an AND-type conditional statement
  *
@@ -27,7 +17,7 @@
  * cond3 REQUIRE(0x0)
  */
 #define macro REQUIRE(zero) = takes (2) returns (1) {
-  // takes:                       [condition, error_sig]
+  // takes:                              [condition, error_sig]
   __Utils_Misc__requireContinue jumpi // [error_sig]
   REVERT_SIG(<zero>)
   __Utils_Misc__requireContinue:      // [error_sig]
@@ -48,6 +38,17 @@
   lt iszero       // [x >= y, error_sig, x, y]
   REQUIRE(<zero>) // [error_sig, x, y]
   pop sub         // [x-y]
+}
+
+
+#define constant MASK_ADDR = 0xffffffffffffffffffffffffffffffffffffffff
+
+
+
+#define macro REQUIRE_ADDR(zero) = takes(1) returns(0) {
+  // takes:                    [addr_value]
+  dup1 [MASK_ADDR] and      // [addr_value & MASK_ADDR, addr_value]
+  eq REQUIRE_NO_SIG(<zero>) // []
 }
 
 /// @dev underflow safe subtraction which throws same error as solidity
