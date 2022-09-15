@@ -46,7 +46,7 @@ Huff.
 - [x] internal "safe" burn macro (checks token existance): `ERC721H__FULL_BURN`
 - [x] internal default supportsInterface macro: `ERC721H__SUPPORTS_INTERFACE`
 
-## Gas Comparison
+## Gas Comparison (ERC721H vs ERC721A vs OpenZeppelin's ERC721)
 |                      Tests|    Huff|   Azuki|Azuki (delta vs. Huff)|        OZ| OZ (delta vs. Huff)|
 |---------------------------|--------|--------|-------------|----------|-----------|
 |                   Mint 200| 437,232| 447,020|       -9,788| 4,999,553| -4,562,321|
