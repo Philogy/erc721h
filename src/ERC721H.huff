@@ -56,6 +56,7 @@
 // _globalIndices.burnCounter  (size:  64, offset:  64) - global amount of tokens burnt
 // _globalIndices.extraData    (size: 128, offset: 128) - arbitrary auxillary data
 #define constant ERC721H__NOT_CUR_INDEX_MASK = 0xffffffffffffffffffffffffffffffffffffffffffffffff0000000000000000
+#define constant ERC721H__INCREASE_BURN = 0x10000000000000000
 #define constant ERC721H_SLOT__GLOBAL_INDICES = FREE_STORAGE_POINTER()
 
 // _packedAddressData: mapping((account) => (aux, balance)) [keccak256(<slotConstant> || account)]
@@ -72,6 +73,7 @@
 // .aux             (size:  94, offset: 162) - arbitrary auxillary data (TODO)
 #define constant ERC721H__BURNED_MASK           = 0x10000000000000000000000000000000000000000
 #define constant ERC721H__NEXT_INITIALIZED_MASK = 0x20000000000000000000000000000000000000000
+#define constant ERC721H__NEXT_BURNED_MASK = 0x30000000000000000000000000000000000000000
 #define constant ERC721H__CLEAN_OWNER_MASK = 0xffffffffffffffffffffffff0000000000000000000000000000000000000000
 #define constant ERC721H_SLOT__OWNER_DATA = 0xc467d14b14f0170613c30fe1df235f316f42dc7d319044e13f083a1bdf2761b0
 
@@ -227,6 +229,47 @@
   // returns:                       [owner_data, orig_owner_data_slot, current_index]
 }
 
+#define macro ERC721H__GET_PACKED_OWNERSHIP_GLOB_INDICES_SAFE(zero) = takes(1) returns(3) {
+  // takes:                         [token_id]
+
+  // --- check token_id not below start ID
+  // TODO: Replace once compiler fixed
+  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
+  //                                [error_sig, token_id]
+  [ERC721H__START_TOKEN_ID] dup3 // [token_id, startTokenId, error_sig, token_id]
+  lt iszero REQUIRE(<zero>)      // [error_sig, token_id]
+
+  // --- check token_id below next ID
+  [ERC721H_SLOT__GLOBAL_INDICES] sload
+  //                                [glob_indices, error_sig, token_id]
+  swap1 dup2 [MASK64] and        // [current_index, error_sig, glob_indices, token_id]
+  dup4 lt REQUIRE(<zero>) pop    // [glob_indices, token_id]
+
+  // --- check burn flag
+  swap1                          // [token_id, glob_indices]
+  [ERC721H_SLOT__OWNER_DATA] add // [direct_owner_data_slot, glob_indices]
+  dup1 sload                     // [owner_data, initial_owner_data_slot, glob_indices]
+  // TODO: Replace once compiler fixed
+  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
+  //                                [error_sig, owner_data, initial_owner_data_slot, glob_indices]
+  dup2 [ERC721H__BURNED_MASK] and
+  //                                [burned_flag, error_sig, owner_data, initial_owner_data_slot, glob_indices]
+  iszero REQUIRE(<zero>)         // [owner_data, initial_owner_data_slot, glob_indices]
+
+  // --- find owner data while loop
+  pop dup1                       // [owner_data, owner_data, initial_owner_data_slot, glob_indices]
+  __ERC721H__getOwnerDataLoopEnd jumpi
+  __ERC721H__getOwnerDataLoopContinue:
+    //                              [prev_owner_data, prev_owner_data_slot, glob_indices]
+    pop                          // [prev_owner_data_slot, glob_indices]
+    [NEG1] add                   // [new_owner_data_slot, glob_indices]
+    dup1 sload                   // [new_owner_data, new_owner_data_slot, glob_indices]
+    dup1 iszero __ERC721H__getOwnerDataLoopContinue jumpi
+
+  __ERC721H__getOwnerDataLoopEnd:
+  // returns:                       [owner_data, orig_owner_data_slot, glob_indices]
+}
+
 #define macro __ERC721H__OWNER_OF() = takes(0) returns(0) {
   NO_VALUE_CHECK(returndatasize)
   0x4 calldataload                    // [token_id]
@@ -283,15 +326,15 @@
   0xcf4700e4
   //                                [error_sig, token_id]
   [ERC721H__START_TOKEN_ID] dup3 // [token_id, startTokenId, error_sig, token_id]
-  lt iszero REQUIRE(callvalue)      // [error_sig, token_id]
+  lt iszero REQUIRE(callvalue)   // [error_sig, token_id]
   [ERC721H_SLOT__GLOBAL_INDICES] sload
   //                                [glob_indices, error_sig, token_id]
   [MASK64] and                   // [currentIndex, error_sig, token_id]
-  dup3 lt REQUIRE(callvalue)        // [error_sig, token_id]
+  dup3 lt REQUIRE(callvalue)     // [error_sig, token_id]
   [ERC721H_SLOT__OWNER_DATA]     // [owner_data_slot_offset, error_sig, token_id]
   dup3 add sload                 // [direct_token_owner_data, error_sig, token_id]
-  [ERC721H__BURNED_MASK] and     // [burned_flag << 160, error_sig, token_id]
-  iszero REQUIRE(callvalue) pop     // [token_id]
+  [ERC721H__BURNED_MASK] and     // [burned_flag, error_sig, token_id]
+  iszero REQUIRE(callvalue) pop  // [token_id]
 
   [ERC721H_SLOT__TOKEN_APPROVALS] add
   //                                [token_approval_slot]
@@ -477,6 +520,72 @@
 
   __ERC721H__safeMintContinue:
   //                    [to, lastIndex]
+}
+
+#define macro ERC721H__DIRECT_BURN(zero) = takes(4) returns(0) {
+  // takes:                 [owner_data, owner_data, -, glob_indices, token_id]
+
+  // --- update owner data
+  dup1 [ERC721H__NEXT_BURNED_MASK] or
+  //                        [new_owner_data, owner_data, -, glob_indices, token_id]
+  dup5 [ERC721H_SLOT__OWNER_DATA] add
+  //                        [owner_data_slot, new_owner_data, owner_data, -, glob_indices, token_id]
+  sstore                 // [owner_data, -, glob_indices, token_id]
+
+  // --- emit Transfer, tokenId) event 
+  dup1 [MASK_ADDR] and   // [owner, owner_data, -, glob_indices, token_id]
+  dup5 <zero> dup4       // [owner, 0, token_id, owner, owner_data, -, glob_indices, token_id]
+  __EVENT_HASH(Transfer) // [Transfer.sig, owner, 0, token_id, owner, owner_data, -, glob_indices, token_id]
+  <zero> <zero> log4     // [owner, owner_data, -, glob_indices, token_id]
+
+  // --- update balance
+  [ERC721H_SLOT__PACKED_ADDRESS_DATA] <zero> mstore
+  //                        [owner, owner_data, -, glob_indices, token_id]
+  0x20 mstore            // [owner_data, -, glob_indices, token_id]
+  0x40 callvalue sha3    // [address_data_slot, owner_data, -, glob_indices, token_id]
+  0x01 dup2 sload        // [address_data, 0x01, address_data_slot, owner_data, -, glob_indices, token_id]
+  sub swap1 sstore       // [owner_data, -, glob_indices, token_id]
+
+  // --- updated global indices
+  dup3 [ERC721H__INCREASE_BURN] add
+  //                        [glob_indices', owner_data, -, glob_indices, token_id]
+  [ERC721H_SLOT__GLOBAL_INDICES] sstore
+  //                        [owner_data, -, glob_indices, token_id]
+
+  // --- update next owner data if necessary
+  dup1 [ERC721H__NEXT_INITIALIZED_MASK] and
+  //                        [next_initialized_flag, owner_data, -, glob_indices, token_id]
+  __ERC721H__burnSetNextEnd4 jumpi
+    //                      [owner_data, -, glob_indices, token_id]
+    swap3 0x01 add       // [next_token_id, -, glob_indices, owner_data]
+    swap2 [MASK64] and   // [current_index, -, next_token_id, owner_data]
+    dup3 eq __ERC721H__burnSetNextEnd3 jumpi
+      //                    [-, next_token_id, owner_data]
+      pop [ERC721H_SLOT__OWNER_DATA] add
+      //                    [next_owner_data_slot, owner_data]
+      dup1 sload         // [next_owner_data, next_owner_data_slot, owner_data]
+      __ERC721H__burnSetNextEnd2 jumpi
+        //                  [next_owner_data_slot, owner_data]
+        sstore           // []
+      __ERC721H__burnSetNextEnd0 jump
+
+  __ERC721H__burnSetNextEnd4:
+  pop
+  __ERC721H__burnSetNextEnd3:
+  pop
+  __ERC721H__burnSetNextEnd2:
+  pop pop
+  __ERC721H__burnSetNextEnd0:
+  // returns:               []
+}
+
+#define macro ERC721H__FULL_BURN(zero) = takes(1) returns(0) {
+  // takes:   [token_id]
+  dup1
+  ERC721H__GET_PACKED_OWNERSHIP_GLOB_INDICES_SAFE(<zero>)
+  //          [owner_data, -, glob_indices, token_id]
+  ERC721H__DIRECT_BURN(<zero>)
+  // returns: []
 }
 
 #define error TransferFromIncorrectOwner()

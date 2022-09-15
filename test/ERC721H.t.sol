@@ -3,14 +3,16 @@ pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
 import {HuffDeployer} from "foundry-huff/HuffDeployer.sol";
-import {ERC721} from "solmate/tokens/ERC721.sol";
 import {IERC721H} from "../src/IERC721H.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-abstract contract MockERC721H is ERC721 {
+interface IMockERC721H is IERC721 {
     function mint(address, uint256) external virtual;
 
     function safeMint(address, uint256) external virtual;
+
+    function burn(uint256) external virtual;
 
     function totalSupply() external view virtual returns (uint256);
 }
@@ -82,14 +84,14 @@ contract ERC721HTest is Test {
     address constant USER2 = address(bytes20(keccak256("user2")));
     address constant USER3 = address(bytes20(keccak256("user3")));
     address constant ATTACKER1 = address(bytes20(keccak256("attacker1")));
-    MockERC721H internal token;
+    IMockERC721H internal token;
 
     event Transfer(address indexed, address indexed, uint256 indexed);
     event Approval(address indexed, address indexed, uint256 indexed);
     event ApprovalForAll(address indexed, address indexed, bool);
 
     function setUp() public {
-        token = MockERC721H(HuffDeployer.config().deploy("MockERC721H"));
+        token = IMockERC721H(HuffDeployer.config().deploy("MockERC721H"));
         vm.label(address(token), "Token");
         vm.label(USER1, "user1");
         vm.label(USER2, "user2");
@@ -293,7 +295,7 @@ contract ERC721HTest is Test {
         assertEq(token.isApprovedForAll(USER1, USER2), false);
         assertEq(token.isApprovedForAll(USER2, USER1), false);
 
-        vm.expectEmit(true, true, false, true);
+        vm.expectEmit(true, true, true, true);
         emit ApprovalForAll(USER1, USER2, true);
 
         vm.prank(USER1);
@@ -301,7 +303,7 @@ contract ERC721HTest is Test {
         assertEq(token.isApprovedForAll(USER1, USER2), true);
         assertEq(token.isApprovedForAll(USER2, USER1), false);
 
-        vm.expectEmit(true, true, false, true);
+        vm.expectEmit(true, true, true, true);
         emit ApprovalForAll(USER1, USER2, false);
 
         vm.prank(USER1);
@@ -309,7 +311,7 @@ contract ERC721HTest is Test {
         assertEq(token.isApprovedForAll(USER1, USER2), false);
         assertEq(token.isApprovedForAll(USER2, USER1), false);
 
-        vm.expectEmit(true, true, false, true);
+        vm.expectEmit(true, true, true, true);
         emit ApprovalForAll(USER2, USER3, false);
         vm.prank(USER2);
         token.setApprovalForAll(USER3, false);
@@ -342,7 +344,7 @@ contract ERC721HTest is Test {
         vm.prank(ATTACKER1);
         token.approve(ATTACKER1, 1);
 
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Approval(USER1, USER2, 1);
         vm.prank(USER1);
         token.approve(USER2, 1);
@@ -354,7 +356,7 @@ contract ERC721HTest is Test {
 
         token.mint(USER2, 4);
 
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Approval(USER2, USER3, 4);
         vm.prank(USER2);
         token.approve(USER3, 4);
@@ -368,7 +370,7 @@ contract ERC721HTest is Test {
         token.setApprovalForAll(USER2, true);
 
         vm.prank(USER2);
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Approval(USER1, USER3, 2);
         token.approve(USER3, 2);
         assertEq(token.getApproved(2), USER3);
@@ -380,7 +382,7 @@ contract ERC721HTest is Test {
         assertEq(token.balanceOf(USER2), 0);
 
         vm.prank(USER1);
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Transfer(USER1, USER2, 2);
         token.transferFrom(USER1, USER2, 2);
 
@@ -399,7 +401,7 @@ contract ERC721HTest is Test {
         token.approve(USER3, 4);
 
         vm.prank(USER3);
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Transfer(USER1, USER2, 4);
         token.transferFrom(USER1, USER2, 4);
 
@@ -419,12 +421,12 @@ contract ERC721HTest is Test {
         vm.prank(USER1);
         token.setApprovalForAll(USER3, true);
 
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Transfer(USER1, USER2, 4);
         vm.prank(USER3);
         token.transferFrom(USER1, USER2, 4);
 
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Transfer(USER1, USER3, 2);
         vm.prank(USER3);
         token.transferFrom(USER1, USER3, 2);
@@ -454,7 +456,7 @@ contract ERC721HTest is Test {
         vm.prank(USER1);
         token.transferFrom(USER1, USER3, 1);
 
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Transfer(USER2, USER3, 1);
         vm.prank(USER2);
         token.transferFrom(USER2, USER3, 1);
@@ -480,7 +482,7 @@ contract ERC721HTest is Test {
     function testNoDataSafeTransferFromToEOA() public {
         token.mint(USER1, 5);
 
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Transfer(USER1, USER2, 5);
         vm.prank(USER1);
         token.safeTransferFrom(USER1, USER2, 5);
@@ -490,7 +492,7 @@ contract ERC721HTest is Test {
         vm.prank(USER1);
         token.setApprovalForAll(USER3, true);
 
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Transfer(USER1, USER3, 4);
         vm.prank(USER3);
         token.safeTransferFrom(USER1, USER3, 4);
@@ -607,7 +609,7 @@ contract ERC721HTest is Test {
     function testDataSafeTransferFromToEOA() public {
         token.mint(USER1, 5);
 
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Transfer(USER1, USER2, 5);
         vm.prank(USER1);
         token.safeTransferFrom(USER1, USER2, 5, "");
@@ -617,7 +619,7 @@ contract ERC721HTest is Test {
         vm.prank(USER1);
         token.setApprovalForAll(USER3, true);
 
-        vm.expectEmit(true, true, true, false);
+        vm.expectEmit(true, true, true, true);
         emit Transfer(USER1, USER3, 4);
         vm.prank(USER3);
         token.safeTransferFrom(USER1, USER3, 4, hex"010203");
@@ -707,13 +709,12 @@ contract ERC721HTest is Test {
             address from,
             uint256 tokenId,
             bytes memory receivedData,
-            uint256 totalCalldataSize
+
         ) = acceptor.receives(0);
         assertEq(operator, USER1);
         assertEq(from, USER1);
         assertEq(tokenId, 5);
         assertEq(receivedData, data);
-        // assertEq(totalCalldataSize, 4 + 0x20 * 5);
 
         data = abi.encodePacked(
             keccak256("piece1"),
@@ -729,13 +730,11 @@ contract ERC721HTest is Test {
         assertEq(token.balanceOf(USER1), 3);
         assertEq(token.balanceOf(address(acceptor)), 2);
         assertEq(token.ownerOf(4), address(acceptor));
-        (operator, from, tokenId, receivedData, totalCalldataSize) = acceptor
-            .receives(1);
+        (operator, from, tokenId, receivedData, ) = acceptor.receives(1);
         assertEq(operator, USER2);
         assertEq(from, USER1);
         assertEq(tokenId, 4);
         assertEq(receivedData, data);
-        // assertEq(totalCalldataSize, 4 + 0x20 * 5);
 
         data = "";
         vm.prank(USER2);
@@ -747,13 +746,38 @@ contract ERC721HTest is Test {
         assertEq(token.balanceOf(USER1), 2);
         assertEq(token.balanceOf(address(acceptor)), 3);
         assertEq(token.ownerOf(3), address(acceptor));
-        (operator, from, tokenId, receivedData, totalCalldataSize) = acceptor
-            .receives(2);
+        (operator, from, tokenId, receivedData, ) = acceptor.receives(2);
         assertEq(operator, USER3);
         assertEq(from, USER1);
         assertEq(tokenId, 3);
         assertEq(receivedData, data);
-        // assertEq(totalCalldataSize, 4 + 0x20 * 5);
+    }
+
+    function testBurn() public {
+        token.mint(USER1, 4);
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(USER1, address(0), 3);
+        token.burn(3);
+
+        vm.expectRevert(IERC721H.OwnerQueryForNonexistentToken.selector);
+        token.ownerOf(3);
+
+        assertEq(token.ownerOf(1), USER1);
+        assertEq(token.ownerOf(2), USER1);
+        assertEq(token.ownerOf(4), USER1);
+        assertEq(token.totalSupply(), 3);
+        assertEq(token.balanceOf(USER1), 3);
+
+        token.mint(USER2, 10);
+        assertEq(token.totalSupply(), 13);
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(USER1, address(0), 4);
+        token.burn(4);
+
+        assertEq(token.ownerOf(5), USER2);
+        assertEq(token.ownerOf(6), USER2);
     }
 
     function testSupportsInterface() public {
@@ -766,6 +790,6 @@ contract ERC721HTest is Test {
 
     function runDebug() public {
         setUp();
-        testDataSafeTransferToReceiver();
+        testBurn();
     }
 }
