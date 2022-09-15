@@ -756,6 +756,14 @@ contract ERC721HTest is Test {
         // assertEq(totalCalldataSize, 4 + 0x20 * 5);
     }
 
+    function testSupportsInterface() public {
+        assertEq(token.supportsInterface(0x01ffc9a7), true);
+        assertEq(token.supportsInterface(0x80ac58cd), true);
+        assertEq(token.supportsInterface(0x5b5e139f), true);
+        assertEq(token.supportsInterface(0x01ffc9a6), false);
+        assertEq(token.supportsInterface(0x00000000), false);
+    }
+
     function runDebug() public {
         setUp();
         testDataSafeTransferToReceiver();

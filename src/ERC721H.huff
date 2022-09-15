@@ -662,6 +662,16 @@
   stop
 }
 
+#define macro ERC721H__SUPPORTS_INTERFACE() = takes(1) returns(1) {
+  // takes:                             [interface_id]
+  // ERC165 interface ID
+  dup1 __RIGHTPAD(0x01ffc9a7) eq     // [eq_interface_id1, interface_id]
+  // ERC721 interface ID
+  dup2 __RIGHTPAD(0x80ac58cd) eq or  // [eq_interface_id12, interface_id]
+  // ERC721Metadata interface ID
+  swap1 __RIGHTPAD(0x5b5e139f) eq or // [eq_interface_id123]
+}
+
 #define macro _ERC721H_CONSTRUCTOR() = takes(0) returns(0) {
   [ERC721H__START_TOKEN_ID] [ERC721H_SLOT__GLOBAL_INDICES] sstore // _currentIndex = START_TOKEN_ID
 }
@@ -691,7 +701,7 @@
  * @dev 13 ERC721 methods each have a unique 4-bit sequence 12 bits in
  * which is used for the constant lookup in the jump table
  */
-#define macro _ERC721H_SELECTOR_SWITCH(name, symbol, tokenURI) = takes(1) returns(1) {
+#define macro _ERC721H_SELECTOR_SWITCH(name, symbol, tokenURI, supportsInterface) = takes(1) returns(1) {
   // takes:         [selector]
   dup1 [SIG_NO_DATA_SAFE_TRANSFER_FROM] eq __ERC721H__noDataSafeTransferFrom jumpi
   //                [selector]
@@ -745,6 +755,7 @@
     __ERC721H__SET_APPROVAL_FOR_ALL()
   __ERC721H__supportsInterface:
     dup1 __FUNC_SIG(supportsInterface) sub __ERC721H__selectorSwitchContinue jumpi
+    <supportsInterface> jump
   __ERC721H__name:
     dup1 __FUNC_SIG(name) sub __ERC721H__selectorSwitchContinue jumpi
     <name> jump

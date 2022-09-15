@@ -26,8 +26,8 @@ Huff.
 - [x] internal `name()` connection
 - [x] internal `symbol()` connection
 - [x] internal `tokenURI(uint256)` connection
+- [x] internal `supportsInterface(bytes4)` connection
 
-- [ ] public `supportsInterface(bytes4)`
 - [x] public `totalSupply()`
 - [x] public `transferFrom(address, address, uint256)`
 - [x] public `safeTransferFrom(address, address, uint256)`
@@ -43,6 +43,7 @@ Huff.
 - [x] internal safe mint (with receive check) macro: `ERC721H__SAFE_MINT`
 - [x] internal transfer (no receive check) macro: `ERC721H__TRANSFER`
 - [ ] internal burn macro: `ERC721H__BURN`
+- [x] internal default supportsInterface macro: `ERC721H__SUPPORTS_INTERFACE`
 
 ### Progress - testing
 TODO
