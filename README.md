@@ -40,6 +40,7 @@ Huff.
 
 - [x] internal (no receive check) mint macro: `ERC721H__MINT`
 - [x] internal safe mint (with receive check) macro: `ERC721H__SAFE_MINT`
+- [x] internal transfer (no receive check) macro: `ERC721H__TRANSFER`
 - [ ] internal burn macro: `ERC721H__BURN`
 
 ### Progress - testing
