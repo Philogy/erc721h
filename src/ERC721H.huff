@@ -149,17 +149,21 @@
 #define macro ERC721H__GET_PACKED_OWNERSHIP_SAFE(zero) = takes(1) returns(2) {
   // takes:                         [token_id]
 
+  // --- check token_id not below start ID
   // TODO: Replace once compiler fixed
   0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
   //                                [error_sig, token_id]
   [ERC721H__START_TOKEN_ID] dup3 // [token_id, startTokenId, error_sig, token_id]
   lt iszero REQUIRE(<zero>)      // [error_sig, token_id]
+
+  // --- check token_id below next ID
   [ERC721H_SLOT__GLOBAL_INDICES] sload
   //                                [glob_indices, error_sig, token_id]
   [MASK64] and                   // [currentIndex, error_sig, token_id]
   dup3 lt REQUIRE(<zero>) pop    // [token_id]
-  [ERC721H_SLOT__OWNER_DATA] add // [direct_owner_data_slot]
 
+  // --- check burn flag
+  [ERC721H_SLOT__OWNER_DATA] add // [direct_owner_data_slot]
   dup1 sload                     // [owner_data, initial_owner_data_slot]
   // TODO: Replace once compiler fixed
   0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
@@ -167,6 +171,8 @@
   dup2 [ERC721H__BURNED_MASK] and
   //                                [burned_flag, error_sig, owner_data, initial_owner_data_slot]
   iszero REQUIRE(<zero>)         // [owner_data, initial_owner_data_slot]
+
+  // --- find owner data while loop
   pop dup1                       // [owner_data, owner_data, initial_owner_data_slot]
   __ERC721H__getOwnerDataLoopEnd jumpi
   __ERC721H__getOwnerDataLoopContinue:
@@ -177,14 +183,55 @@
     dup1 iszero __ERC721H__getOwnerDataLoopContinue jumpi
 
   __ERC721H__getOwnerDataLoopEnd:
-  // returns:                       [owner_data, owner_data_slot]
+  // returns:                       [owner_data, orig_owner_data_slot]
+}
+
+#define macro ERC721H__GET_PACKED_OWNERSHIP_CURRENT_INDEX_SAFE(zero) = takes(1) returns(3) {
+  // takes:                         [token_id]
+
+  // --- check token_id not below start ID
+  // TODO: Replace once compiler fixed
+  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
+  //                                [error_sig, token_id]
+  [ERC721H__START_TOKEN_ID] dup3 // [token_id, startTokenId, error_sig, token_id]
+  lt iszero REQUIRE(<zero>)      // [error_sig, token_id]
+
+  // --- check token_id below next ID
+  [ERC721H_SLOT__GLOBAL_INDICES] sload
+  //                                [glob_indices, error_sig, token_id]
+  [MASK64] and swap1 dup2        // [current_index, error_sig, current_index, token_id]
+  dup4 lt REQUIRE(<zero>) pop    // [current_index, token_id]
+
+  // --- check burn flag
+  swap1                          // [token_id, current_index]
+  [ERC721H_SLOT__OWNER_DATA] add // [direct_owner_data_slot, current_index]
+  dup1 sload                     // [owner_data, initial_owner_data_slot, current_index]
+  // TODO: Replace once compiler fixed
+  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
+  //                                [error_sig, owner_data, initial_owner_data_slot, current_index]
+  dup2 [ERC721H__BURNED_MASK] and
+  //                                [burned_flag, error_sig, owner_data, initial_owner_data_slot, current_index]
+  iszero REQUIRE(<zero>)         // [owner_data, initial_owner_data_slot, current_index]
+
+  // --- find owner data while loop
+  pop dup1                       // [owner_data, owner_data, initial_owner_data_slot, current_index]
+  __ERC721H__getOwnerDataLoopEnd jumpi
+  __ERC721H__getOwnerDataLoopContinue:
+    //                              [prev_owner_data, prev_owner_data_slot, current_index]
+    pop                          // [prev_owner_data_slot, current_index]
+    [NEG1] add                   // [new_owner_data_slot, current_index]
+    dup1 sload                   // [new_owner_data, new_owner_data_slot, current_index]
+    dup1 iszero __ERC721H__getOwnerDataLoopContinue jumpi
+
+  __ERC721H__getOwnerDataLoopEnd:
+  // returns:                       [owner_data, orig_owner_data_slot, current_index]
 }
 
 #define macro __ERC721H__OWNER_OF() = takes(0) returns(0) {
   NO_VALUE_CHECK(returndatasize)
   0x4 calldataload                    // [token_id]
   ERC721H__GET_PACKED_OWNERSHIP_SAFE(callvalue)
-  [MASK_ADDR] and                     // [owner, orig_data_slot]
+  [MASK_ADDR] and                     // [owner, -]
   RETURN1(callvalue)
 }
 
@@ -194,34 +241,34 @@
   NO_VALUE_CHECK(returndatasize)
   0x24 calldataload dup1    // [token_id, token_id]
   ERC721H__GET_PACKED_OWNERSHIP_SAFE(callvalue)
-  //                           [owner_data, owner_data_slot, token_id]
-  [MASK_ADDR] and           // [owner, owner_data_slot, token_id]
-  dup1 caller eq            // [owner == msg.sender, owner, owner_data_slot, token_id]
+  //                           [owner_data, -, token_id]
+  [MASK_ADDR] and           // [owner, -, token_id]
+  dup1 caller eq            // [owner == msg.sender, owner, -, token_id]
   __ERC721H__approveAuthConfirm jumpi
-    //                         [owner, owner_data_slot, token_id]
+    //                         [owner, -, token_id]
     [ERC721H_SLOT__OPERATOR_APPROVALS] callvalue mstore
-    //                         [owner, owner_data_slot, token_id]
-    dup1 0x20 mstore        // [owner, owner_data_slot, token_id]
-    caller 0x40 mstore      // [owner, owner_data_slot, token_id]
-    caller 0x40 mstore      // [owner, owner_data_slot, token_id]
-    0x60 callvalue sha3     // [approved_for_all_slot, owner, owner_data_slot, token_id]
-    sload                   // [approved_for_all, owner, owner_data_slot, token_id]
+    //                         [owner, -, token_id]
+    dup1 0x20 mstore        // [owner, -, token_id]
+    caller 0x40 mstore      // [owner, -, token_id]
+    caller 0x40 mstore      // [owner, -, token_id]
+    0x60 callvalue sha3     // [approved_for_all_slot, owner, -, token_id]
+    sload                   // [approved_for_all, owner, -, token_id]
   __ERC721H__approveAuthConfirm jumpi
     // TODO: Replace once compiler fixed
     0xcfb3b942 // __FUNC_SIG(ApprovalCallerNotOwnerNorApproved)
     REVERT_SIG(callvalue)
   __ERC721H__approveAuthConfirm:
-    //                         [owner, owner_data_slot, token_id]
-  0x04 calldataload         // [to, owner, owner_data_slot, token_id]
+    //                         [owner, -, token_id]
+  0x04 calldataload         // [to, owner, -, token_id]
   dup1 REQUIRE_ADDR(callvalue)
-  //                           [to, owner, owner_data_slot, token_id]
-  swap1 dup2                // [to, owner, to, owner_data_slot, token_id]
-  dup5 swap2                // [owner, to, token_id, to, owner_data_slot, token_id]
-  __EVENT_HASH(Approval)    // [Approval.sig, owner, to, token_id, to, owner_data_slot, token_id]
-  callvalue callvalue log4  // [to, owner_data_slot, token_id]
-  swap1 swap2               // [token_id, to, owner_data_slot]
+  //                           [to, owner, -, token_id]
+  swap1 dup2                // [to, owner, to, -, token_id]
+  dup5 swap2                // [owner, to, token_id, to, -, token_id]
+  __EVENT_HASH(Approval)    // [Approval.sig, owner, to, token_id, to, -, token_id]
+  callvalue callvalue log4  // [to, -, token_id]
+  swap1 swap2               // [token_id, to, -]
   [ERC721H_SLOT__TOKEN_APPROVALS] add
-  //                           [approval_slot, to, owner_data_slot]
+  //                           [approval_slot, to, -]
   sstore
   stop
 }
@@ -436,95 +483,92 @@
   dup1 REQUIRE_ADDR(callvalue) // [to, from]
   0x44 calldataload            // [token_id, to, from]
 
-  dup1 ERC721H__GET_PACKED_OWNERSHIP_SAFE(callvalue)
+  dup1 ERC721H__GET_PACKED_OWNERSHIP_CURRENT_INDEX_SAFE(callvalue)
 
   // --- check from address equals owner
-  //                              [owner_data, owner_data_slot, token_id, to, from]
+  //                              [owner_data, -, current_index, token_id, to, from]
   // TODO: Replace once compiler fixed
   0xa1148100 // __FUNC_SIG(TransferFromIncorrectOwner)
-  //                              [error_sig, owner_data, owner_data_slot, token_id, to, from]
-  dup2 [MASK_ADDR] and dup7    // [from, owner, error_sig, owner_data, owner_data_slot, token_id, to, from]
-  eq REQUIRE(callvalue) pop    // [owner_data, owner_data_slot, token_id, to, from]
+  //                              [error_sig, owner_data, -, current_index, token_id, to, from]
+  dup2 [MASK_ADDR] and dup8    // [from, owner, error_sig, owner_data, -, current_index, token_id, to, from]
+  eq REQUIRE(callvalue) pop    // [owner_data, -, current_index, token_id, to, from]
 
   // --- check approval
-  dup3 [ERC721H_SLOT__TOKEN_APPROVALS] add
-  //                              [token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
-  dup1 sload                   // [approved_addr, token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
-  dup1 caller eq               // [approved_addr == msg.sender, approved_addr, token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
-  dup8 caller eq or            // [msg.sender == from || approved_addr == msg.sender, approved_addr, token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
+  dup4 [ERC721H_SLOT__TOKEN_APPROVALS] add
+  //                              [token_approval_slot, owner_data, -, current_index, token_id, to, from]
+  dup1 sload                   // [approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
+  dup1 caller eq               // [approved_addr == msg.sender, approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
+  dup9 caller eq or            // [msg.sender == from || approved_addr == msg.sender, approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
   __ERC721H__transferFromAuthConfirm jumpi
-    //                            [approved_addr, token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
+    //                            [approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
     [ERC721H_SLOT__OPERATOR_APPROVALS] callvalue mstore
-    dup7 0x20 mstore
+    dup8 0x20 mstore
     caller 0x40 mstore
-    //                            [approved_addr, token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
+    //                            [approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
     __FUNC_SIG(TransferCallerNotOwnerNorApproved)
-    //                            [error_sig, approved_addr, token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
-    0x60 callvalue sha3        // [operator_approval_slot, error_sig, approved_addr, token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
+    //                            [error_sig, approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
+    0x60 callvalue sha3        // [operator_approval_slot, error_sig, approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
     sload REQUIRE(callvalue) pop
-    //                            [approved_addr, token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
+    //                            [approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
   __ERC721H__transferFromAuthConfirm:
-  //                              [approved_addr, token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
+  //                              [approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
 
   // --- reset token approval if necessary
   iszero __ERC721H__transferFromResetTokenApprovalEnd jumpi
-  //                              [token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
-  callvalue swap1 sstore       // [owner_data, owner_data_slot, token_id, to, from]
-  callvalue                    // [0, owner_data, owner_data_slot, token_id, to, from]
+  //                              [token_approval_slot, owner_data, -, current_index, token_id, to, from]
+  callvalue swap1 sstore       // [owner_data, -, current_index, token_id, to, from]
+  callvalue                    // [0, owner_data, -, current_index, token_id, to, from]
   __ERC721H__transferFromResetTokenApprovalEnd:
-  //                              [0 \\ token_approval_slot, owner_data, owner_data_slot, token_id, to, from]
-  pop                          // [owner_data, owner_data_slot, token_id, to, from]
+  //                              [0 \\ token_approval_slot, owner_data, -, current_index, token_id, to, from]
+  pop                          // [owner_data, -, current_index, token_id, to, from]
 
   // --- adjust balances
   [ERC721H_SLOT__PACKED_ADDRESS_DATA] callvalue mstore
-  //                              [owner_data, owner_data_slot, token_id, to, from]
-  swap4 0x20 mstore            // [owner_data_slot, token_id, to, owner_data]
-  0x40 callvalue sha3          // [from_addr_data_slot, owner_data_slot, token_id, to, owner_data]
-  0x01 dup2 sload sub          // [from_addr_data - 1, from_addr_data_slot, owner_data_slot, token_id, to, owner_data]
-  swap1 sstore                 // [owner_data_slot, token_id, to, owner_data]
-  dup3 0x20 mstore             // [owner_data_slot, token_id, to, owner_data]
-  0x40 callvalue sha3          // [to_addr_data_slot, owner_data_slot, token_id, to, owner_data]
-  0x01 dup2 sload add          // [to_addr_data + 1, to_addr_data_slot, owner_data_slot, token_id, to, owner_data]
-  swap1 sstore                 // [owner_data_slot, token_id, to, owner_data]
+  //                              [owner_data, -, current_index, token_id, to, from]
+  dup6 0x20 mstore             // [owner_data, -, current_index, token_id, to, from]
+  0x40 callvalue sha3          // [from_addr_data_slot, owner_data, -, current_index, token_id, to, from]
+  0x01 dup2 sload sub          // [from_addr_data - 1, from_addr_data_slot, owner_data, -, current_index, token_id, to, from]
+  swap1 sstore                 // [owner_data, -, current_index, token_id, to, from]
+  dup5 0x20 mstore             // [owner_data, -, current_index, token_id, to, from]
+  0x40 callvalue sha3          // [to_addr_data_slot, owner_data, -, current_index, token_id, to, from]
+  0x01 dup2 sload add          // [to_addr_data + 1, to_addr_data_slot, owner_data, -, current_index, token_id, to, from]
+  swap1 sstore                 // [owner_data, -, current_index, token_id, to, from]
 
   // --- store new token data
-  dup4 [ERC721H__CLEAN_OWNER_MASK] and
-  //                              [cleaned_owner_data, owner_data_slot, token_id, to, owner_data]
-  dup4 or [ERC721H__NEXT_INITIALIZED_MASK] or
-  //                              [new_owner_data, owner_data_slot, token_id, to, owner_data]
-  dup3 [ERC721H_SLOT__OWNER_DATA] add
-  //                              [owner_data_slot, new_owner_data, owner_data_slot, token_id, to, owner_data]
-  sstore                       // [owner_data_slot, token_id, to, owner_data]
+  dup1 [ERC721H__CLEAN_OWNER_MASK] and
+  //                              [cleaned_owner_data, owner_data, -, current_index, token_id, to, from]
+  dup6 or [ERC721H__NEXT_INITIALIZED_MASK] or
+  //                              [new_owner_data, owner_data, -, current_index, token_id, to, from]
+  dup5 [ERC721H_SLOT__OWNER_DATA] add
+  //                              [new_owner_data_slot, new_owner_data, owner_data, -, current_index, token_id, to, from]
+  sstore                       // [owner_data, -, current_index, token_id, to, from]
 
   // --- check and set next owner data
-  dup4 [ERC721H__NEXT_INITIALIZED_MASK] and
-  //                              [next_initialized_flag, owner_data_slot, token_id, to, owner_data]
-  __ERC721H__transferFromSetNextEnd4 jumpi
-  //                              [owner_data_slot, token_id, to, owner_data]
-    dup2                       // [token_id, owner_data_slot, token_id, to, owner_data]
-    0x01 add                   // [next_token_id, owner_data_slot, token_id, to, owner_data]
-    dup1 [ERC721H_SLOT__OWNER_DATA] add
-    //                            [next_owner_data_slot, next_token_id, owner_data_slot, token_id, to, owner_data]
-    dup1 sload __ERC721H__transferFromSetNextEnd6 jumpi
-    //                            [next_owner_data_slot, next_token_id, owner_data_slot, token_id, to, owner_data]
-    swap1                      // [next_token_id, next_owner_data_slot, owner_data_slot, token_id, to, owner_data]
-    [ERC721H_SLOT__GLOBAL_INDICES] sload [MASK64] and
-    //                            [current_index, next_token_id, next_owner_data_slot, owner_data_slot, token_id, to, owner_data]
-    eq __ERC721H__transferFromSetNextEnd5 jumpi
-    //                            [next_owner_data_slot, owner_data_slot, token_id, to, owner_data]
-    dup5 swap1 sstore          // [owner_data_slot, token_id, to, owner_data]
-    __ERC721H__transferFromSetNextEnd4 jump
+  dup1 [ERC721H__NEXT_INITIALIZED_MASK] and
+  //                              [next_initialized_flag, owner_data, -, current_index, token_id, to, from]
+  __ERC721H__transferFromSetNextEnd5 jumpi
+  //                              [owner_data, -, current_index, token_id, to, from]
+    dup4 0x01 add              // [next_token_id, owner_data, -, current_index, token_id, to, from]
+    swap3 dup4                 // [next_token_id, current_index, owner_data, -, next_token_id, token_id, to, from]
+    eq __ERC721H__transferFromSetNextEnd6 jumpi
+    //                            [owner_data, -, next_token_id, token_id, to, from]
+      swap2                    // [next_token_id, -, owner_data, token_id, to, from]
+      [ERC721H_SLOT__OWNER_DATA] add
+      //                          [next_owner_data_slot, -, owner_data, token_id, to, from]
+      dup1 sload __ERC721H__transferFromSetNextEnd6 jumpi
+      //                          [next_owner_data_slot, -, owner_data, token_id, to, from]
+      dup3 swap1               // [next_owner_data_slot, owner_data, -, owner_data, token_id, to, from]
+      sstore                   // [-, owner_data, token_id, to, from]
+    __ERC721H__transferFromSetNextEnd5 jump
 
   __ERC721H__transferFromSetNextEnd6:
   pop
   __ERC721H__transferFromSetNextEnd5:
   pop
-  __ERC721H__transferFromSetNextEnd4:
-  pop
-  //                              [token_id, to, owner_data]
-  swap1 0x04 calldataload      // [from, to, token_id, owner_data]
+  //                              [-, token_id, to, from]
+  pop swap2                    // [from, to, token_id]
   __EVENT_HASH(Transfer) callvalue callvalue log4
-  //                              [owner_data]
+  //                              []
   stop
 }
 

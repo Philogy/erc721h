@@ -359,7 +359,7 @@ contract ERC721HTest is Test {
         assertEq(token.ownerOf(3), USER1);
         assertEq(token.ownerOf(4), USER1);
         assertEq(token.balanceOf(USER1), 3);
-        assertEq(token.balanceOf(USER2), 1);
+        assertEq(token.balanceOf(USER2), 1, "recipient balance");
     }
 
     function testTransferFromAsTokenApproved() public {
