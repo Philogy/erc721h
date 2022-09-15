@@ -70,7 +70,7 @@ Huff.
 
 To generate the above table run the following commands
 ```bash
-forge build // necessary to ensure no warnings in `forge test` output
+forge build # necessary to ensure no warnings in `forge test` output
 forge test --match-contract CompareERC721Test --ffi -vvvv > gas-compare.txt
 python script/extract_gas_cost_comparison.py
 ```
