@@ -1,1 +1,2 @@
 @openzeppelin/=lib/openzeppelin-contracts/
+erc721a/=lib/ERC721A/

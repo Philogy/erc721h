@@ -3,19 +3,9 @@ pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
 import {HuffDeployer} from "foundry-huff/HuffDeployer.sol";
-import {IERC721H} from "../src/IERC721H.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-
-interface IMockERC721H is IERC721 {
-    function mint(address, uint256) external virtual;
-
-    function safeMint(address, uint256) external virtual;
-
-    function burn(uint256) external virtual;
-
-    function totalSupply() external view virtual returns (uint256);
-}
+import {IERC721H} from "../src/IERC721H.sol";
+import {IMockERC721H} from "../src/refs/IMockERC721H.sol";
 
 contract AnyDataAcceptor {
     fallback() external {}
