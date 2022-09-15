@@ -28,7 +28,7 @@ Huff.
 - [x] internal `tokenURI(uint256)` connection
 
 - [x] public `totalSupply()`
-- [ ] public `transferFrom(address, address, uint256)`
+- [x] public `transferFrom(address, address, uint256)`
 - [ ] public `safeTransferFrom(address, address, uint256)`
 - [ ] public `safeTransferFrom(address, address, uint256, bytes)`
 - [x] public `getApproved(uint256)`
