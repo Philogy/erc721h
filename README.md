@@ -27,10 +27,11 @@ Huff.
 - [x] internal `symbol()` connection
 - [x] internal `tokenURI(uint256)` connection
 
+- [ ] public `supportsInterface(bytes4)`
 - [x] public `totalSupply()`
 - [x] public `transferFrom(address, address, uint256)`
-- [ ] public `safeTransferFrom(address, address, uint256)`
-- [ ] public `safeTransferFrom(address, address, uint256, bytes)`
+- [x] public `safeTransferFrom(address, address, uint256)`
+- [x] public `safeTransferFrom(address, address, uint256, bytes)`
 - [x] public `getApproved(uint256)`
 - [x] public `isApprovedForAll(address, address)`
 - [x] public `approve(address, uint256)`

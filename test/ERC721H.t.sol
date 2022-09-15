@@ -40,6 +40,17 @@ struct Receive {
     uint256 totalCalldataSize;
 }
 
+contract ERC721SemiAcceptor {
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes calldata
+    ) external returns (bytes32) {
+        return keccak256("onERC721Received(address,address,uint256,bytes)");
+    }
+}
+
 contract ERC721Acceptor is IERC721Receiver {
     Receive[] public receives;
 
@@ -259,6 +270,25 @@ contract ERC721HTest is Test {
         assertEq(acceptor.totalReceives(), 3);
     }
 
+    function testSafeMintRevertsIncorrectReceiver() public {
+        ERC721SemiAcceptor acceptor = new ERC721SemiAcceptor();
+        bytes32 fullSelector = acceptor.onERC721Received(
+            address(0),
+            address(0),
+            0,
+            ""
+        );
+        assertEq(
+            bytes4(fullSelector),
+            IERC721Receiver.onERC721Received.selector
+        );
+
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        token.safeMint(address(acceptor), 10);
+    }
+
     function testApprovalForAll() public {
         assertEq(token.isApprovedForAll(USER1, USER2), false);
         assertEq(token.isApprovedForAll(USER2, USER1), false);
@@ -410,6 +440,27 @@ contract ERC721HTest is Test {
         assertEq(token.getApproved(4), address(0));
     }
 
+    function testTransferFromFullyTransfersOwnership() public {
+        token.mint(USER1, 4);
+
+        vm.prank(USER1);
+        token.transferFrom(USER1, USER2, 1);
+
+        vm.expectRevert(IERC721H.TransferCallerNotOwnerNorApproved.selector);
+        vm.prank(USER1);
+        token.transferFrom(USER2, USER1, 1);
+
+        vm.expectRevert(IERC721H.TransferFromIncorrectOwner.selector);
+        vm.prank(USER1);
+        token.transferFrom(USER1, USER3, 1);
+
+        vm.expectEmit(true, true, true, false);
+        emit Transfer(USER2, USER3, 1);
+        vm.prank(USER2);
+        token.transferFrom(USER2, USER3, 1);
+        assertEq(token.ownerOf(1), USER3);
+    }
+
     function testCannotTransferFromToZero() public {
         token.mint(USER1, 4);
 
@@ -426,8 +477,287 @@ contract ERC721HTest is Test {
         token.transferFrom(USER2, USER3, 1);
     }
 
+    function testNoDataSafeTransferFromToEOA() public {
+        token.mint(USER1, 5);
+
+        vm.expectEmit(true, true, true, false);
+        emit Transfer(USER1, USER2, 5);
+        vm.prank(USER1);
+        token.safeTransferFrom(USER1, USER2, 5);
+        assertEq(token.ownerOf(5), USER2);
+        assertEq(token.balanceOf(USER2), 1);
+
+        vm.prank(USER1);
+        token.setApprovalForAll(USER3, true);
+
+        vm.expectEmit(true, true, true, false);
+        emit Transfer(USER1, USER3, 4);
+        vm.prank(USER3);
+        token.safeTransferFrom(USER1, USER3, 4);
+        assertEq(token.ownerOf(4), USER3);
+        assertEq(token.balanceOf(USER3), 1);
+    }
+
+    function testNoDataSafeTransferToReceiver() public {
+        ERC721Acceptor acceptor = new ERC721Acceptor();
+
+        token.mint(USER1, 5);
+
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(USER1, address(acceptor), 5);
+        vm.prank(USER1);
+        token.safeTransferFrom(USER1, address(acceptor), 5);
+        assertEq(token.balanceOf(USER1), 4);
+        assertEq(token.balanceOf(address(acceptor)), 1);
+        assertEq(token.ownerOf(5), address(acceptor));
+        (
+            address operator,
+            address from,
+            uint256 tokenId,
+            bytes memory data,
+            uint256 totalCalldataSize
+        ) = acceptor.receives(0);
+        assertEq(operator, USER1);
+        assertEq(from, USER1);
+        assertEq(tokenId, 5);
+        assertEq(data, "");
+        assertEq(totalCalldataSize, 4 + 0x20 * 5);
+
+        vm.prank(USER1);
+        token.setApprovalForAll(USER2, true);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(USER1, address(acceptor), 4);
+        vm.prank(USER2);
+        token.safeTransferFrom(USER1, address(acceptor), 4);
+        assertEq(token.balanceOf(USER1), 3);
+        assertEq(token.balanceOf(address(acceptor)), 2);
+        assertEq(token.ownerOf(4), address(acceptor));
+        (operator, from, tokenId, data, totalCalldataSize) = acceptor.receives(
+            1
+        );
+        assertEq(operator, USER2);
+        assertEq(from, USER1);
+        assertEq(tokenId, 4);
+        assertEq(data, "");
+        assertEq(totalCalldataSize, 4 + 0x20 * 5);
+
+        vm.prank(USER2);
+        token.approve(USER3, 3);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(USER1, address(acceptor), 3);
+        vm.prank(USER3);
+        token.safeTransferFrom(USER1, address(acceptor), 3);
+        assertEq(token.balanceOf(USER1), 2);
+        assertEq(token.balanceOf(address(acceptor)), 3);
+        assertEq(token.ownerOf(3), address(acceptor));
+        (operator, from, tokenId, data, totalCalldataSize) = acceptor.receives(
+            2
+        );
+        assertEq(operator, USER3);
+        assertEq(from, USER1);
+        assertEq(tokenId, 3);
+        assertEq(data, "");
+        assertEq(totalCalldataSize, 4 + 0x20 * 5);
+    }
+
+    function testNoDataSafeTransferFromToAnyDataAcceptorFails() public {
+        token.mint(USER1, 1);
+
+        address acceptor = address(new AnyDataAcceptor());
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        vm.prank(USER1);
+        token.safeTransferFrom(USER1, acceptor, 1);
+    }
+
+    function testNoDataSafeTransferToNotAcceptor1Fails() public {
+        token.mint(USER1, 1);
+
+        address acceptor = address(new ERC721NotAcceptor1());
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        vm.prank(USER1);
+        token.safeTransferFrom(USER1, acceptor, 1);
+    }
+
+    function testNoDataSafeTransferToNotAcceptor2Fails() public {
+        token.mint(USER1, 1);
+
+        address acceptor = address(new ERC721NotAcceptor2());
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        vm.prank(USER1);
+        token.safeTransferFrom(USER1, acceptor, 1);
+    }
+
+    function testNoDataSafeTransferToSemiAcceptorFails() public {
+        token.mint(USER1, 1);
+
+        address acceptor = address(new ERC721NotAcceptor2());
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        vm.prank(USER1);
+        token.safeTransferFrom(USER1, acceptor, 1);
+    }
+
+    function testDataSafeTransferFromToEOA() public {
+        token.mint(USER1, 5);
+
+        vm.expectEmit(true, true, true, false);
+        emit Transfer(USER1, USER2, 5);
+        vm.prank(USER1);
+        token.safeTransferFrom(USER1, USER2, 5, "");
+        assertEq(token.ownerOf(5), USER2);
+        assertEq(token.balanceOf(USER2), 1);
+
+        vm.prank(USER1);
+        token.setApprovalForAll(USER3, true);
+
+        vm.expectEmit(true, true, true, false);
+        emit Transfer(USER1, USER3, 4);
+        vm.prank(USER3);
+        token.safeTransferFrom(USER1, USER3, 4, hex"010203");
+        assertEq(token.ownerOf(4), USER3);
+        assertEq(token.balanceOf(USER3), 1);
+    }
+
+    function testDataSafeTransferFromToAnyDataAcceptorFails() public {
+        token.mint(USER1, 1);
+
+        address acceptor = address(new AnyDataAcceptor());
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        vm.prank(USER1);
+        token.safeTransferFrom(
+            USER1,
+            acceptor,
+            1,
+            "testDataSafeTransferFromToAnyDataAcceptorFails"
+        );
+    }
+
+    function testDataSafeTransferToNotAcceptor1Fails() public {
+        token.mint(USER1, 1);
+
+        address acceptor = address(new ERC721NotAcceptor1());
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        vm.prank(USER1);
+        token.safeTransferFrom(
+            USER1,
+            acceptor,
+            1,
+            "testDataSafeTransferToNotAcceptor1Fails"
+        );
+    }
+
+    function testDataSafeTransferToNotAcceptor2Fails() public {
+        token.mint(USER1, 1);
+
+        address acceptor = address(new ERC721NotAcceptor2());
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        vm.prank(USER1);
+        token.safeTransferFrom(
+            USER1,
+            acceptor,
+            1,
+            "testDataSafeTransferToNotAcceptor2Fails"
+        );
+    }
+
+    function testDataSafeTransferToSemiAcceptorFails() public {
+        token.mint(USER1, 1);
+
+        address acceptor = address(new ERC721NotAcceptor2());
+        vm.expectRevert(
+            IERC721H.TransferToNonERC721ReceiverImplementer.selector
+        );
+        vm.prank(USER1);
+        token.safeTransferFrom(
+            USER1,
+            acceptor,
+            1,
+            "testDataSafeTransferToSemiAcceptorFails"
+        );
+    }
+
+    function testDataSafeTransferToReceiver() public {
+        ERC721Acceptor acceptor = new ERC721Acceptor();
+
+        token.mint(USER1, 5);
+
+        bytes memory data = hex"010203";
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(USER1, address(acceptor), 5);
+        vm.prank(USER1);
+        token.safeTransferFrom(USER1, address(acceptor), 5, data);
+        assertEq(token.balanceOf(USER1), 4);
+        assertEq(token.balanceOf(address(acceptor)), 1);
+        assertEq(token.ownerOf(5), address(acceptor));
+        (
+            address operator,
+            address from,
+            uint256 tokenId,
+            bytes memory receivedData,
+            uint256 totalCalldataSize
+        ) = acceptor.receives(0);
+        assertEq(operator, USER1);
+        assertEq(from, USER1);
+        assertEq(tokenId, 5);
+        assertEq(receivedData, data);
+        // assertEq(totalCalldataSize, 4 + 0x20 * 5);
+
+        data = abi.encodePacked(
+            keccak256("piece1"),
+            keccak256("piece2"),
+            "added data"
+        );
+        vm.prank(USER1);
+        token.setApprovalForAll(USER2, true);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(USER1, address(acceptor), 4);
+        vm.prank(USER2);
+        token.safeTransferFrom(USER1, address(acceptor), 4, data);
+        assertEq(token.balanceOf(USER1), 3);
+        assertEq(token.balanceOf(address(acceptor)), 2);
+        assertEq(token.ownerOf(4), address(acceptor));
+        (operator, from, tokenId, receivedData, totalCalldataSize) = acceptor
+            .receives(1);
+        assertEq(operator, USER2);
+        assertEq(from, USER1);
+        assertEq(tokenId, 4);
+        assertEq(receivedData, data);
+        // assertEq(totalCalldataSize, 4 + 0x20 * 5);
+
+        data = "";
+        vm.prank(USER2);
+        token.approve(USER3, 3);
+        vm.expectEmit(true, true, true, true);
+        emit Transfer(USER1, address(acceptor), 3);
+        vm.prank(USER3);
+        token.safeTransferFrom(USER1, address(acceptor), 3, data);
+        assertEq(token.balanceOf(USER1), 2);
+        assertEq(token.balanceOf(address(acceptor)), 3);
+        assertEq(token.ownerOf(3), address(acceptor));
+        (operator, from, tokenId, receivedData, totalCalldataSize) = acceptor
+            .receives(2);
+        assertEq(operator, USER3);
+        assertEq(from, USER1);
+        assertEq(tokenId, 3);
+        assertEq(receivedData, data);
+        // assertEq(totalCalldataSize, 4 + 0x20 * 5);
+    }
+
     function runDebug() public {
         setUp();
-        testTransferFrom();
+        testDataSafeTransferToReceiver();
     }
 }
