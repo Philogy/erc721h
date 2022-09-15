@@ -12,4 +12,7 @@ interface IERC721H is IERC721 {
     error AttemptedSafeMintReentrancy();
     error ApprovalQueryForNonexistentToken();
     error ApprovalCallerNotOwnerNorApproved();
+    error TransferFromIncorrectOwner();
+    error TransferCallerNotOwnerNorApproved();
+    error TransferToZeroAddress();
 }

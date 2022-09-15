@@ -43,8 +43,6 @@
 
 #define constant MASK_ADDR = 0xffffffffffffffffffffffffffffffffffffffff
 
-
-
 #define macro REQUIRE_ADDR(zero) = takes(1) returns(0) {
   // takes:                    [addr_value]
   dup1 [MASK_ADDR] and      // [addr_value & MASK_ADDR, addr_value]

@@ -31,12 +31,12 @@
 }
 
 #define macro CONSTRUCTOR() = takes(0) returns(0) {
-  ERC721H_CONSTRUCTOR()
+  _ERC721H_CONSTRUCTOR()
 }
 
 #define macro MAIN() = takes(0) returns(0) {
   GET_SELECTOR()
-  ERC721H_SELECTOR_SWITCH(name, symbol, tokenURI)
+  _ERC721H_SELECTOR_SWITCH(name, symbol, tokenURI)
   dup1 __FUNC_SIG(mint) eq mint jumpi
   dup1 __FUNC_SIG(safeMint) eq safeMint jumpi
   returndatasize returndatasize revert

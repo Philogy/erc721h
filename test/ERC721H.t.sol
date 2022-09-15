@@ -344,8 +344,90 @@ contract ERC721HTest is Test {
         assertEq(token.getApproved(2), USER3);
     }
 
+    function testTransferFrom() public {
+        token.mint(USER1, 4);
+        assertEq(token.balanceOf(USER1), 4);
+        assertEq(token.balanceOf(USER2), 0);
+
+        vm.prank(USER1);
+        vm.expectEmit(true, true, true, false);
+        emit Transfer(USER1, USER2, 2);
+        token.transferFrom(USER1, USER2, 2);
+
+        assertEq(token.ownerOf(1), USER1);
+        assertEq(token.ownerOf(2), USER2);
+        assertEq(token.ownerOf(3), USER1);
+        assertEq(token.ownerOf(4), USER1);
+        assertEq(token.balanceOf(USER1), 3);
+        assertEq(token.balanceOf(USER2), 1);
+    }
+
+    function testTransferFromAsTokenApproved() public {
+        token.mint(USER1, 4);
+
+        vm.prank(USER1);
+        token.approve(USER3, 4);
+
+        vm.prank(USER3);
+        vm.expectEmit(true, true, true, false);
+        emit Transfer(USER1, USER2, 4);
+        token.transferFrom(USER1, USER2, 4);
+
+        assertEq(token.ownerOf(1), USER1);
+        assertEq(token.ownerOf(2), USER1);
+        assertEq(token.ownerOf(3), USER1);
+        assertEq(token.ownerOf(4), USER2);
+        assertEq(token.balanceOf(USER1), 3);
+        assertEq(token.balanceOf(USER2), 1);
+        assertEq(token.balanceOf(USER3), 0);
+        assertEq(token.getApproved(4), address(0));
+    }
+
+    function testTransferFromAsOperatorApproved() public {
+        token.mint(USER1, 4);
+
+        vm.prank(USER1);
+        token.setApprovalForAll(USER3, true);
+
+        vm.expectEmit(true, true, true, false);
+        emit Transfer(USER1, USER2, 4);
+        vm.prank(USER3);
+        token.transferFrom(USER1, USER2, 4);
+
+        vm.expectEmit(true, true, true, false);
+        emit Transfer(USER1, USER3, 2);
+        vm.prank(USER3);
+        token.transferFrom(USER1, USER3, 2);
+
+        assertEq(token.ownerOf(1), USER1);
+        assertEq(token.ownerOf(2), USER3);
+        assertEq(token.ownerOf(3), USER1);
+        assertEq(token.ownerOf(4), USER2);
+        assertEq(token.balanceOf(USER1), 2);
+        assertEq(token.balanceOf(USER2), 1);
+        assertEq(token.balanceOf(USER3), 1);
+        assertEq(token.getApproved(2), address(0));
+        assertEq(token.getApproved(4), address(0));
+    }
+
+    function testCannotTransferFromToZero() public {
+        token.mint(USER1, 4);
+
+        vm.prank(USER1);
+        vm.expectRevert(IERC721H.TransferToZeroAddress.selector);
+        token.transferFrom(USER1, address(0), 1);
+    }
+
+    function testCannotTransferFromIncorrectOwner() public {
+        token.mint(USER1, 4);
+
+        vm.prank(USER1);
+        vm.expectRevert(IERC721H.TransferFromIncorrectOwner.selector);
+        token.transferFrom(USER2, USER3, 1);
+    }
+
     function runDebug() public {
         setUp();
-        testDirectTokenApproval();
+        testTransferFrom();
     }
 }
