@@ -47,7 +47,7 @@ Huff.
 - [x] internal default supportsInterface macro: `ERC721H__SUPPORTS_INTERFACE`
 
 ## Gas Comparison
-|                      Tests|    Huff|   Azuki|Azuki (delta)|        OZ| OZ (delta)|
+|                      Tests|    Huff|   Azuki|Azuki (delta vs. Huff)|        OZ| OZ (delta vs. Huff)|
 |---------------------------|--------|--------|-------------|----------|-----------|
 |                   Mint 200| 437,232| 447,020|       -9,788| 4,999,553| -4,562,321|
 |                    Mint 50| 149,382| 152,120|       -2,738| 1,273,403| -1,124,021|
