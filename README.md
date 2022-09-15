@@ -61,8 +61,8 @@ Huff.
 
 ### Gas Comparison - Methodology
 **General Approach:**
-1. Create minimal reference implementations using the ERC721A and OpenZeppelin libraries respectively, viewable under `src/refs/`.
-2. Created comparison test contract with identical tests for all 3 versions `test/CompareERC721.t.sol`
+1. Create minimal reference implementations using the ERC721A and OpenZeppelin libraries respectively, viewable under [`src/refs/`](src/refs)
+2. Created comparison test contract with identical tests for all 3 versions [`test/CompareERC721.t.sol`](test/CompareERC721.t.sol)
 3. Wrote and ran script that extracts the gas use of the actual main call in each test and adds the 21k base transaction stipend to the total cost of all calls
 
 **Table Generation:**
