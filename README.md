@@ -45,3 +45,16 @@ Huff.
 - [x] internal direct burn macro (doesn't check if token exists): `ERC721H__DIRECT_BURN`
 - [x] internal "safe" burn macro (checks token existance): `ERC721H__FULL_BURN`
 - [x] internal default supportsInterface macro: `ERC721H__SUPPORTS_INTERFACE`
+
+## Gas Comparison
+|                      Tests|    Huff|        OZ| OZ (delta)|   Azuki|Azuki (delta)|
+|---------------------------|--------|----------|-----------|--------|-------------|
+|                   Mint 200| 437,232| 4,999,553| -4,562,321| 447,020|       -9,788|
+|                    Mint 50| 149,382| 1,273,403| -1,124,021| 152,120|       -2,738|
+|  Safe Transfer To Receiver|  63,550|    66,160|     -2,610|  65,436|       -1,886|
+|           Simple Burn 1 In|  60,503|    38,893|    +21,610|  82,611|      -22,108|
+|                Simple Burn|  38,342|    38,893|       -551|  60,214|      -21,872|
+|Simple Safe Transfer To Eoa|  62,379|    64,151|     -1,772|  63,364|         -985|
+|       Simple Transfer 1 In|  81,987|    61,271|    +20,716|  82,958|         -971|
+|      Simple Transfer 20 In| 115,306|    61,271|    +54,035| 119,835|       -4,529|
+|            Simple Transfer|  59,817|    61,271|     -1,454|  60,561|         -744|

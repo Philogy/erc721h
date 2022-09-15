@@ -3,21 +3,27 @@ pragma solidity 0.8.15;
 
 import {Test} from "forge-std/Test.sol";
 import {HuffDeployer} from "foundry-huff/HuffDeployer.sol";
+import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import {IMockERC721H} from "../src/refs/IMockERC721H.sol";
 import {ERC721Azuki} from "../src/refs/ERC721Azuki.sol";
 import {ERC721OZ} from "../src/refs/ERC721OZ.sol";
+
+contract ERC721Receiver is ERC721Holder {}
 
 /// @author Philippe Dumonet <philippe@dumo.net>
 contract CompareERC721Test is Test {
     IMockERC721H internal erc721h;
     ERC721Azuki internal erc721a;
     ERC721OZ internal erc721oz;
+    address internal receiver;
 
     address constant USER1 = address(bytes20(keccak256("user1")));
     address constant USER2 = address(bytes20(keccak256("user2")));
     address constant USER3 = address(bytes20(keccak256("user3")));
 
     function setUp() public {
+        vm.deal(USER1, 3 ether);
+
         erc721h = IMockERC721H(HuffDeployer.config().deploy("MockERC721H"));
         erc721h.mint(USER1, 20);
         vm.prank(USER1);
@@ -32,6 +38,8 @@ contract CompareERC721Test is Test {
         erc721oz.mint(USER1, 20);
         vm.prank(USER1);
         erc721oz.transferFrom(USER1, USER1, 1);
+
+        receiver = address(new ERC721Receiver());
     }
 
     function testMint50OZ() public {
@@ -125,5 +133,35 @@ contract CompareERC721Test is Test {
 
     function testSimpleBurn1InHuff() public {
         erc721h.burn(2);
+    }
+
+    function testSimpleSafeTransferToEoaOZ() public {
+        vm.prank(USER1);
+        erc721oz.safeTransferFrom(USER1, USER2, 1);
+    }
+
+    function testSimpleSafeTransferToEoaAzuki() public {
+        vm.prank(USER1);
+        erc721a.safeTransferFrom(USER1, USER2, 1);
+    }
+
+    function testSimpleSafeTransferToEoaHuff() public {
+        vm.prank(USER1);
+        erc721h.safeTransferFrom(USER1, USER2, 1);
+    }
+
+    function testSafeTransferToReceiverOZ() public {
+        vm.prank(USER1);
+        erc721oz.safeTransferFrom(USER1, receiver, 1, hex"010203");
+    }
+
+    function testSafeTransferToReceiverAzuki() public {
+        vm.prank(USER1);
+        erc721a.safeTransferFrom(USER1, receiver, 1, hex"010203");
+    }
+
+    function testSafeTransferToReceiverHuff() public {
+        vm.prank(USER1);
+        erc721h.safeTransferFrom(USER1, receiver, 1, hex"010203");
     }
 }
