@@ -45,6 +45,3 @@ Huff.
 - [x] internal direct burn macro (doesn't check if token exists): `ERC721H__DIRECT_BURN`
 - [x] internal "safe" burn macro (checks token existance): `ERC721H__FULL_BURN`
 - [x] internal default supportsInterface macro: `ERC721H__SUPPORTS_INTERFACE`
-
-### Progress - testing
-TODO
