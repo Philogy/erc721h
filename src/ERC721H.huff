@@ -474,13 +474,13 @@
   // --- initial call checks and calldata loading
   NO_VALUE_CHECK(returndatasize)
   0x04 calldataload            // [from]
-  dup1 REQUIRE_ADDR(callvalue) // [from]
   0x24 calldataload            // [to, from]
+  dup2 dup2 or REQUIRE_ADDR(callvalue)
+  //                              [to, from]
   // TODO: Replace once compiler fixed
   0xea553b34 // __FUNC_SIG(TransferToZeroAddress)
   //                              [error_sig, to, from]
   dup2 REQUIRE(callvalue) pop  // [to, from]
-  dup1 REQUIRE_ADDR(callvalue) // [to, from]
   0x44 calldataload            // [token_id, to, from]
 
   dup1 ERC721H__GET_PACKED_OWNERSHIP_CURRENT_INDEX_SAFE(callvalue)
