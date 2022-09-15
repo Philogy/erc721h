@@ -362,15 +362,15 @@
 #define macro ERC721H__MINT(zero, mem1, mem2) = takes(2) returns(2) {
   // takes:             [to, quantity]
 
-  // -- check quantity > 0
+  // --- check quantity > 0
   __FUNC_SIG(MintZeroQuantity) dup3 REQUIRE(<zero>) pop
   //                    [to, quantity]
 
-  // -- check address != 0
+  // --- check address != 0
   __FUNC_SIG(MintToZeroAddress) dup2 REQUIRE(<zero>) pop
   //                    [to, quantity]
 
-  // -- update balance
+  // --- update balance
   [ERC721H_SLOT__PACKED_ADDRESS_DATA] <mem1> mstore
   //                    [to, quantity]
   dup1 <mem2> mstore // [to, quantity]
@@ -379,35 +379,29 @@
   dup4 add           // [address_data', address_data_slot, to, quantity]
   swap1 sstore       // [to, quantity]
 
-  // -- get and update current index (= first index in batch)
+  // --- get and update current index (= first index in batch)
   [ERC721H_SLOT__GLOBAL_INDICES]
   //                    [glob_indices_slot, to, quantity]
   dup1 sload         // [glob_indices, glob_indices_slot, to, quantity]
   dup1 [MASK64] and
-  //                    [currentIndex, glob_indices, glob_indices_slot, to, quantity]
-  swap4 dup5 add     // [lastIndex_notMasked, glob_indices, glob_indices_slot, to, currentIndex]
-  [MASK64] and
-  //                    [lastIndex, glob_indices, glob_indices_slot, to, currentIndex]
-  dup1 swap2         // [glob_indices, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
-  [ERC721H__NOT_CUR_INDEX_MASK] and
-  //                    [global_indices \ currentIndex, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
-  or                 // [glob_indices', lastIndex, glob_indices_slot, to, currentIndex]
-  swap1 swap2        // [glob_indices_slot, glob_indices', lastIndex, to, currentIndex]
-  sstore             // [lastIndex, to, currentIndex]
+  //                    [current_index, glob_indices, glob_indices_slot, to, quantity]
+  swap4 add          // [glob_indices', glob_indices_slot, to, current_index]
+  dup1 [MASK64] and
+  //                    [last_index, glob_indices', glob_indices_slot, to, current_index]
+  swap2 sstore       // [last_index, to, current_index]
 
-  // -- save owner of tokens
-  dup2               // [to, lastIndex, to, currentIndex]
+  // --- save owner of tokens
+  dup2               // [to, last_index, to, current_index]
   dup4 [ERC721H_SLOT__OWNER_DATA] add
-  //                    [tokenSlot, to, lastIndex, to, currentIndex]
-  sstore             // [lastIndex, to, currentIndex]
-  swap2              // [currentIndex, to, lastIndex]
+  //                    [owner_data_slot, to, last_index, to, current_index]
+  sstore             // [last_index, to, current_index]
+  swap2              // [current_index, to, last_index]
 
-  // -- emit transfer events
+  // --- emit transfer events
   __ERC721H__MINT_EVENT_LOOP(<zero>)
 
   //                    [to, lastIndex]
 }
-
 
 #define error TransferToNonERC721ReceiverImplementer()
 #define error AttemptedSafeMintReentrancy()
@@ -457,16 +451,11 @@
   //                    [glob_indices_slot, to, quantity]
   dup1 sload         // [glob_indices, glob_indices_slot, to, quantity]
   dup1 [MASK64] and
-  //                    [currentIndex, glob_indices, glob_indices_slot, to, quantity]
-  swap4 dup5 add     // [lastIndex_notMasked, glob_indices, glob_indices_slot, to, currentIndex]
-  [MASK64] and
-  //                    [lastIndex, glob_indices, glob_indices_slot, to, currentIndex]
-  dup1 swap2         // [glob_indices, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
-  [ERC721H__NOT_CUR_INDEX_MASK] and
-  //                    [global_indices \ currentIndex, lastIndex, lastIndex, glob_indices_slot, to, currentIndex]
-  or                 // [glob_indices', lastIndex, glob_indices_slot, to, currentIndex]
-  swap1 swap2        // [glob_indices_slot, glob_indices', lastIndex, to, currentIndex]
-  sstore             // [lastIndex, to, currentIndex]
+  //                    [current_index, glob_indices, glob_indices_slot, to, quantity]
+  swap4 add          // [glob_indices', glob_indices_slot, to, current_index]
+  dup1 [MASK64] and
+  //                    [last_index, glob_indices', glob_indices_slot, to, current_index]
+  swap2 sstore       // [last_index, to, current_index]
 
   // --- save owner of tokens
   dup2               // [to, lastIndex, to, currentIndex]
