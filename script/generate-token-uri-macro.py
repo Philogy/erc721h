@@ -48,21 +48,21 @@ def main():
 # define constant {args.prefix}BASE_URI_ID_OFFSET = 0x{base_uri_len + 0x40:x}
 {uri_section_constants}
 
-# define constant OUTPUT_CHAR_BASE = 0x61 // 'a'
+#define constant OUTPUT_CHAR_BASE = 0x61 // 'a'
 
 # define macro {args.prefix}RETURN_URI(zero) = takes(1) returns(0) {{
   // takes:                   [token_id]
 
   [{args.prefix}BASE_URI_ID_OFFSET]
   //                          [char_offset, token_id]
-  __URI__idToStringContinue:
+  {args.prefix}RETURN_URI__idToStringContinue:
     //                        [char_offset, token_id]
     swap1 dup1 0xf and     // [bits, token_id, char_offset]
     [OUTPUT_CHAR_BASE] add // [char, token_id, char_offset]
     dup3 mstore8           // [token_id, char_offset]
     0x4 shr                // [token_id', char_offset]
     swap1 0x1 add          // [next_char_offset, token_id']
-  dup2 __URI__idToStringContinue jumpi
+  dup2 {args.prefix}RETURN_URI__idToStringContinue jumpi
   //                          [ret_len = final_char_offset, 0]
 
 {uri_mstores}  //                          [ret_len, 0]
