@@ -5,7 +5,9 @@ import argparse
 def parse_args():
 
     parser = argparse.ArgumentParser(
-        description='generates macro that returns a token URI based on some provided base URI, the base URI cannot be changed after contract deployment')
+        description='generates macro that returns a token URI based on some \
+provided base URI, the base URI cannot be changed after contract deployment'
+    )
     parser.add_argument(
         'base_uri', type=str, help='the base URI to be prepended to token IDs'
     )
@@ -40,12 +42,14 @@ def main():
 
     uri_section_constants = ''
     for i, section in enumerate(uri_sections[::-1], start=1):
-        uri_section_constants += f'#define constant {args.prefix}BASE_URI{i} = 0x{section.hex()}\n'
+        uri_section_constants +=\
+            f'#define constant {args.prefix}BASE_URI{i} = 0x{section.hex()}\n'
 
-    final_code = f'''// generated using ERC721H's `generate-token-uri-macro` script v0.1
+    final_code = f'''// generated using ERC721H's `generate-token-uri-macro` \
+script v0.1
 
 // base URI = "{args.base_uri}" (length: {base_uri_len})
-# define constant {args.prefix}BASE_URI_ID_OFFSET = 0x{base_uri_len + 0x40:x}
+#define constant {args.prefix}BASE_URI_ID_OFFSET = 0x{base_uri_len + 0x40:x}
 {uri_section_constants}
 
 #define constant OUTPUT_CHAR_BASE = 0x61 // 'a'
