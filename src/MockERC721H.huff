@@ -97,7 +97,7 @@
   0x44 calldataload
   0x24 calldataload
   0x04 calldataload
-  MECHS__SHUFFLE(callvalue, callvalue, 0x20)
+  MECHS__ONE_WAY_SHUFFLE(callvalue, callvalue, 0x20)
   pop RETURN1(callvalue)
 }
 
