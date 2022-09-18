@@ -1,12 +1,49 @@
 #include "./utils/Misc.huff"
+#include "./utils/Mechs.huff"
 #include "./ERC721H.huff"
+
 
 
 #define function mint(address, uint256) nonpayable returns ()
 #define function safeMint(address, uint256) nonpayable returns ()
 #define function burn(uint256) nonpayable returns ()
+#define function shuffle(bytes32, uint256, uint256, uint256) view returns (uint256)
 
 #define constant ERC721H__START_TOKEN_ID = 0x1
+
+// generated using ERC721H's `generate-token-uri-macro` script v0.1
+#define constant MOCK_ERC721H__BASE_URI1 = 0x68747470733a2f2f6170692e6d6f636b2d6c6f6e672d75726c2d776f772d646f
+#define constant MOCK_ERC721H__BASE_URI2 = 0x6d61696e2d646566696e6974656c792d7265616c69737469632d6e6f742d6261
+#define constant MOCK_ERC721H__BASE_URI3 = 0x642e636f6d2f
+#define constant MOCK_ERC721H__BASE_URI_ID_OFFSET = 0x86
+
+#define constant OUTPUT_CHAR_BASE = 0x61 // 'a'
+
+#define macro MOCK_ERC721H__RETURN_URI(zero) = takes(1) returns(0) {
+  // takes:                   [token_id]
+
+  [MOCK_ERC721H__BASE_URI_ID_OFFSET]
+  //                          [char_offset, token_id]
+  __URI__idToStringContinue:
+    //                        [char_offset, token_id]
+    swap1 dup1 0xf and     // [bits, token_id, char_offset]
+    [OUTPUT_CHAR_BASE] add // [char, token_id, char_offset]
+    dup3 mstore8           // [token_id, char_offset]
+    0x4 shr                // [token_id', char_offset]
+    swap1 0x1 add          // [next_char_offset, token_id']
+  dup2 __URI__idToStringContinue jumpi
+  //                          [ret_len = final_char_offset, 0]
+
+  [MOCK_ERC721H__BASE_URI3] 0x66 mstore
+  [MOCK_ERC721H__BASE_URI2] 0x60 mstore
+  [MOCK_ERC721H__BASE_URI1] 0x40 mstore
+  //                          [ret_len, 0]
+
+  0x40 dup2 sub            // [str_len, ret_len, 0]
+  0x20 mstore              // [ret_len, 0]
+  0x20 <zero> mstore       // [ret_len, 0]
+  <zero> return
+}
 
 #define macro MINT() = takes(0) returns(0) {
   NO_VALUE_CHECK(returndatasize)
@@ -48,12 +85,29 @@
   stop
 }
 
+#define macro TOKEN_URI() = takes(0) returns(0) {
+  NO_VALUE_CHECK()
+  0x04 calldataload
+  MOCK_ERC721H__RETURN_URI(callvalue)
+}
+
+#define macro SHUFFLE() = takes(0) returns(0) {
+  NO_VALUE_CHECK()
+  0x64 calldataload
+  0x44 calldataload
+  0x24 calldataload
+  0x04 calldataload
+  MECHS__SHUFFLE(callvalue, callvalue, 0x20)
+  pop RETURN1(callvalue)
+}
+
 #define macro MAIN() = takes(0) returns(0) {
   GET_SELECTOR()
   _ERC721H_SELECTOR_SWITCH(name, symbol, tokenURI, supportsInterface)
   dup1 __FUNC_SIG(mint) eq mint jumpi
   dup1 __FUNC_SIG(safeMint) eq safeMint jumpi
   dup1 __FUNC_SIG(burn) eq burn jumpi
+  dup1 __FUNC_SIG(shuffle) eq shuffle jumpi
   returndatasize returndatasize revert
 
   mint:
@@ -62,12 +116,14 @@
     SAFE_MINT()
   burn:
     BURN()
+  shuffle:
+    SHUFFLE()
   name:
     EMPTY_STRING()
   symbol:
     EMPTY_STRING()
   tokenURI:
-    EMPTY_STRING()
+    TOKEN_URI()
   supportsInterface:
     SUPPORTS_INTERFACE()
     

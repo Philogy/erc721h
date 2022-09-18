@@ -95,3 +95,36 @@
   0x20 mstore
   0x24 0x1c revert
 }
+
+#define macro NOT_TERNARY() = takes(3) returns(1) {
+  // takes:   [not_condition, x, y]
+  __Utils_Misc__ternaryNoSwap jumpi
+    swap1
+  __Utils_Misc__ternaryNoSwap:
+  pop
+  // returns: [!not_condition ? x : y]
+}
+
+#define macro MAX() = takes(2) returns(1) {
+  // takes:       [x, y]
+
+  dup1 dup3 gt // [y > x, x, y]
+  NOT_TERNARY()
+  // returns:  [max(x, y)]
+}
+
+#define macro MIN() = takes(2) returns(1) {
+  // takes:       [x, y]
+
+  dup1 dup3 lt // [y < x, x, y]
+  NOT_TERNARY()
+  // returns:  [min(x, y)]
+}
+
+
+#define constant NEG1 = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+#define macro SUB1() = takes(1) returns(1) {
+  // takes:   [x]
+  [NEG1] add
+  // returns: [x-1]
+}

@@ -3,7 +3,6 @@
 /// @notice A reusable base implementation of the ERC721A token contract written in Huff
 
 /* Imports */
-#include "./utils/HashMap.huff"
 #include "./utils/Misc.huff"
 
 /* ERC721 Interface */
@@ -49,7 +48,6 @@
 
 /* Storage Layout */
 #define constant MASK64 = 0xffffffffffffffff
-#define constant NEG1 = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
 
 
 // _globalIndices.currentIndex (size:  64, offset:   0) - the next token ID to be minted
@@ -180,7 +178,7 @@
   __ERC721H__getOwnerDataLoopContinue:
     //                              [prev_owner_data, prev_owner_data_slot]
     pop                          // [prev_owner_data_slot]
-    [NEG1] add                   // [new_owner_data_slot]
+    SUB1()                       // [new_owner_data_slot]
     dup1 sload                   // [new_owner_data, new_owner_data_slot]
     dup1 iszero __ERC721H__getOwnerDataLoopContinue jumpi
 

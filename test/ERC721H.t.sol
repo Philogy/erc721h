@@ -3,9 +3,38 @@ pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
 import {HuffDeployer} from "foundry-huff/HuffDeployer.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IERC721H} from "../src/IERC721H.sol";
 import {IMockERC721H} from "../src/refs/IMockERC721H.sol";
+
+contract Set {
+    mapping(uint256 => bool) public contains;
+    bool public duplicatedAdded;
+    uint256 public size;
+
+    uint256 public max;
+    uint256 public min;
+
+    function add(uint256 _data) external returns (bool) {
+        if (size == 0) {
+            max = _data;
+            min = _data;
+        } else {
+            if (_data > max) max = _data;
+            if (_data < min) min = _data;
+        }
+
+        if (!contains[_data]) {
+            size++;
+            contains[_data] = true;
+            return true;
+        } else {
+            duplicatedAdded = true;
+            return false;
+        }
+    }
+}
 
 contract AnyDataAcceptor {
     fallback() external {}
@@ -70,11 +99,15 @@ contract ERC721Acceptor is IERC721Receiver {
 }
 
 contract ERC721HTest is Test {
+    using Strings for uint256;
+
     address constant USER1 = address(bytes20(keccak256("user1")));
     address constant USER2 = address(bytes20(keccak256("user2")));
     address constant USER3 = address(bytes20(keccak256("user3")));
     address constant ATTACKER1 = address(bytes20(keccak256("attacker1")));
     IMockERC721H internal token;
+
+    mapping(uint256 => uint256) internal rev;
 
     event Transfer(address indexed, address indexed, uint256 indexed);
     event Approval(address indexed, address indexed, uint256 indexed);
@@ -778,8 +811,39 @@ contract ERC721HTest is Test {
         assertEq(token.supportsInterface(0x00000000), false);
     }
 
+    function testShuffle() public {
+        bytes32 seed = keccak256("very random sentence, 98179878798");
+        uint256 rounds = 45;
+        uint256 indexCount = 1000;
+
+        Set indices = new Set();
+
+        for (uint256 i; i < indexCount; i++) {
+            uint256 resIndex = token.shuffle(seed, i, indexCount, rounds);
+            bool unique = indices.add(resIndex);
+            if (unique) {
+                rev[resIndex] = i;
+            } else {
+                uint256 collided = rev[resIndex];
+                fail(
+                    string(
+                        abi.encodePacked(
+                            "collision ",
+                            collided.toString(),
+                            " <--> ",
+                            i.toString()
+                        )
+                    )
+                );
+            }
+        }
+
+        assertEq(indices.size(), indexCount, "not all in set");
+        assertEq(indices.min(), 0, "above bound");
+    }
+
     function runDebug() public {
         setUp();
-        testBurn();
+        testShuffle();
     }
 }
