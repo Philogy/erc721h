@@ -4,7 +4,7 @@
 #define constant POS_MAX = 0xffffffff00
 
 // based off: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#compute_shuffled_index
-#define macro MECHS__SHUFFLE(zero, mem1, mem2) = takes(4) returns(4) {
+#define macro MECHS__SHUFFLE(mem1, mem2) = takes(4) returns(4) {
   // takes:               [seed, index, index_count, iters]
 
   __Mechs__shuffleContinue:
