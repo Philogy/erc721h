@@ -1,6 +1,5 @@
 #include "./utils/Misc.huff"
 
-#define constant MASK64 = 0xffffffffffffffff
 #define constant POS_MAX = 0xffffffff00
 
 // based off: https://github.com/ethereum/consensus-specs/blob/dev/specs/phase0/beacon-chain.md#compute_shuffled_index
