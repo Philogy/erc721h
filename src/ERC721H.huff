@@ -150,8 +150,7 @@
   // takes:                         [token_id]
 
   // --- check token_id not below start ID
-  // TODO: Replace once compiler fixed
-  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
+  __FUNC_SIG(OwnerQueryForNonexistentToken)
   //                                [error_sig, token_id]
   [ERC721H__START_TOKEN_ID] dup3 // [token_id, startTokenId, error_sig, token_id]
   lt iszero REQUIRE(<zero>)      // [error_sig, token_id]
@@ -165,8 +164,7 @@
   // --- check burn flag
   [ERC721H_SLOT__OWNER_DATA] add // [direct_owner_data_slot]
   dup1 sload                     // [owner_data, initial_owner_data_slot]
-  // TODO: Replace once compiler fixed
-  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
+  __FUNC_SIG(OwnerQueryForNonexistentToken)
   //                                [error_sig, owner_data, initial_owner_data_slot]
   dup2 [ERC721H__BURNED_MASK] and
   //                                [burned_flag, error_sig, owner_data, initial_owner_data_slot]
@@ -190,8 +188,7 @@
   // takes:                         [token_id]
 
   // --- check token_id not below start ID
-  // TODO: Replace once compiler fixed
-  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
+  __FUNC_SIG(OwnerQueryForNonexistentToken)
   //                                [error_sig, token_id]
   [ERC721H__START_TOKEN_ID] dup3 // [token_id, startTokenId, error_sig, token_id]
   lt iszero REQUIRE(<zero>)      // [error_sig, token_id]
@@ -206,8 +203,7 @@
   swap1                          // [token_id, current_index]
   [ERC721H_SLOT__OWNER_DATA] add // [direct_owner_data_slot, current_index]
   dup1 sload                     // [owner_data, initial_owner_data_slot, current_index]
-  // TODO: Replace once compiler fixed
-  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
+  __FUNC_SIG(OwnerQueryForNonexistentToken)
   //                                [error_sig, owner_data, initial_owner_data_slot, current_index]
   dup2 [ERC721H__BURNED_MASK] and
   //                                [burned_flag, error_sig, owner_data, initial_owner_data_slot, current_index]
@@ -231,8 +227,7 @@
   // takes:                         [token_id]
 
   // --- check token_id not below start ID
-  // TODO: Replace once compiler fixed
-  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
+  __FUNC_SIG(OwnerQueryForNonexistentToken)
   //                                [error_sig, token_id]
   [ERC721H__START_TOKEN_ID] dup3 // [token_id, startTokenId, error_sig, token_id]
   lt iszero REQUIRE(<zero>)      // [error_sig, token_id]
@@ -247,8 +242,7 @@
   swap1                          // [token_id, glob_indices]
   [ERC721H_SLOT__OWNER_DATA] add // [direct_owner_data_slot, glob_indices]
   dup1 sload                     // [owner_data, initial_owner_data_slot, glob_indices]
-  // TODO: Replace once compiler fixed
-  0xdf2d9b42 // __FUNC_SIG(OwnerQueryForNonexistentToken)
+  __FUNC_SIG(OwnerQueryForNonexistentToken)
   //                                [error_sig, owner_data, initial_owner_data_slot, glob_indices]
   dup2 [ERC721H__BURNED_MASK] and
   //                                [burned_flag, error_sig, owner_data, initial_owner_data_slot, glob_indices]
@@ -295,8 +289,7 @@
     0x60 callvalue sha3     // [approved_for_all_slot, owner, -, token_id]
     sload                   // [approved_for_all, owner, -, token_id]
   __ERC721H__approveAuthConfirm jumpi
-    // TODO: Replace once compiler fixed
-    0xcfb3b942 // __FUNC_SIG(ApprovalCallerNotOwnerNorApproved)
+    __FUNC_SIG(ApprovalCallerNotOwnerNorApproved)
     REVERT_SIG(callvalue)
   __ERC721H__approveAuthConfirm:
     //                         [owner, -, token_id]
@@ -484,8 +477,7 @@
 
       dup1 <mem4> mstore
       //                [curTokenId, to, lastIndex]
-      // __FUNC_SIG(TransferToNonERC721ReceiverImplementer)
-      0xd1a57ed6 // TODO: Replace once compiler fixed
+      __FUNC_SIG(TransferToNonERC721ReceiverImplementer)
       //                [error_sig, curTokenId, to, lastIndex]
       0x04 <mem1_1c> 0xa4 <mem1_1c> <zero> dup8 gas call
       //                [suc, error_sig, curTokenId, to, lastIndex]
@@ -585,8 +577,7 @@
   0x24 calldataload            // [to, from]
   dup2 dup2 or REQUIRE_ADDR(callvalue)
   //                              [to, from]
-  // TODO: Replace once compiler fixed
-  0xea553b34 // __FUNC_SIG(TransferToZeroAddress)
+  __FUNC_SIG(TransferToZeroAddress)
   //                              [error_sig, to, from]
   dup2 REQUIRE(callvalue) pop  // [to, from]
   0x44 calldataload            // [token_id, to, from]
@@ -599,8 +590,7 @@
 
   // --- check from address equals owner
   //                              [owner_data, -, current_index, token_id, to, from]
-  // TODO: Replace once compiler fixed
-  0xa1148100 // __FUNC_SIG(TransferFromIncorrectOwner)
+  __FUNC_SIG(TransferFromIncorrectOwner)
   //                              [error_sig, owner_data, -, current_index, token_id, to, from]
   dup2 [MASK_ADDR] and dup8    // [from, owner, error_sig, owner_data, -, current_index, token_id, to, from]
   eq REQUIRE(<zero>) pop       // [owner_data, -, current_index, token_id, to, from]
@@ -617,8 +607,7 @@
     dup8 0x20 mstore
     caller 0x40 mstore
     //                            [approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
-    // TODO: Replace once compiler fixed
-    0x59c896be // __FUNC_SIG(TransferCallerNotOwnerNorApproved)
+    __FUNC_SIG(TransferCallerNotOwnerNorApproved)
     //                            [error_sig, approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
     0x60 <zero> sha3           // [operator_approval_slot, error_sig, approved_addr, token_approval_slot, owner_data, -, current_index, token_id, to, from]
     sload REQUIRE(<zero>) pop
@@ -712,8 +701,7 @@
   0x04 swap5 gas call          // [suc, from]
 
   // ---verify return data
-  // TODO: Replace once compiler fixed
-  0xd1a57ed6 swap1 // __FUNC_SIG(TransferToNonERC721ReceiverImplementer)
+  __FUNC_SIG(TransferToNonERC721ReceiverImplementer) swap1
   //                              [suc, error_sig, from]
   ERC721H__AFTER_CALL_RECEIVE_CHECK(callvalue, callvalue)
   //                              [error_sig, from]
@@ -748,8 +736,7 @@
   0x04 swap5 gas call          // [suc, from]
 
   // ---verify return data
-  // TODO: Replace once compiler fixed
-  0xd1a57ed6 swap1 // __FUNC_SIG(TransferToNonERC721ReceiverImplementer)
+  __FUNC_SIG(TransferToNonERC721ReceiverImplementer) swap1
   //                              [suc, error_sig, from]
   ERC721H__AFTER_CALL_RECEIVE_CHECK(callvalue, callvalue)
   //                              [error_sig, from]
