@@ -354,11 +354,17 @@
   // takes:             [to, quantity]
 
   // --- check quantity > 0
-  __FUNC_SIG(MintZeroQuantity) dup3 REQUIRE(<zero>) pop
+  dup2 quantity_gt_zero jumpi
+  __FUNC_SIG(MintZeroQuantity) REVERT_SIG(<zero>)
+  quantity_gt_zero:
+
   //                    [to, quantity]
 
   // --- check address != 0
-  __FUNC_SIG(MintToZeroAddress) dup2 REQUIRE(<zero>) pop
+  dup1 address_not_zero jumpi
+  __FUNC_SIG(MintToZeroAddress) REVERT_SIG(<zero>)
+  address_not_zero:
+
   //                    [to, quantity]
 
   // --- update balance
