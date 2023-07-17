@@ -6,6 +6,7 @@ import {HuffDeployer} from "foundry-huff/HuffDeployer.sol";
 import {ERC721Holder} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import {IMockERC721H} from "../src/refs/IMockERC721H.sol";
 import {ERC721Azuki} from "../src/refs/ERC721Azuki.sol";
+import {ERC721Solady} from "../src/refs/ERC721Solady.sol";
 import {ERC721OZ} from "../src/refs/ERC721OZ.sol";
 
 contract ERC721Receiver is ERC721Holder {}
@@ -14,6 +15,7 @@ contract ERC721Receiver is ERC721Holder {}
 contract CompareERC721Test is Test {
     IMockERC721H internal erc721h;
     ERC721Azuki internal erc721a;
+    ERC721Solady internal erc721s;
     ERC721OZ internal erc721oz;
     address internal receiver;
 
@@ -34,6 +36,11 @@ contract CompareERC721Test is Test {
         vm.prank(USER1);
         erc721a.transferFrom(USER1, USER1, 1);
 
+        erc721s = new ERC721Solady();
+        erc721s.mint(USER1, 20);
+        vm.prank(USER1);
+        erc721s.transferFrom(USER1, USER1, 1);
+
         erc721oz = new ERC721OZ();
         erc721oz.mint(USER1, 20);
         vm.prank(USER1);
@@ -44,6 +51,10 @@ contract CompareERC721Test is Test {
 
     function testMint50OZ() public {
         erc721oz.mint(USER1, 50);
+    }
+
+    function testMint50Solady() public {
+        erc721s.mint(USER1, 50);
     }
 
     function testMint50Azuki() public {
@@ -58,6 +69,10 @@ contract CompareERC721Test is Test {
         erc721oz.mint(USER1, 200);
     }
 
+    function testMint200Solady() public {
+        erc721s.mint(USER1, 200);
+    }
+
     function testMint200Azuki() public {
         erc721a.mint(USER1, 200);
     }
@@ -69,6 +84,11 @@ contract CompareERC721Test is Test {
     function testSimpleTransfer20InOZ() public {
         vm.prank(USER1);
         erc721oz.transferFrom(USER1, USER2, 20);
+    }
+
+    function testSimpleTransfer20Solady() public {
+        vm.prank(USER1);
+        erc721s.transferFrom(USER1, USER2, 20);
     }
 
     function testSimpleTransfer20InAzuki() public {
@@ -86,6 +106,11 @@ contract CompareERC721Test is Test {
         erc721oz.transferFrom(USER1, USER2, 2);
     }
 
+    function testSimpleTransfer1InSolady() public {
+        vm.prank(USER1);
+        erc721s.transferFrom(USER1, USER2, 2);
+    }
+
     function testSimpleTransfer1InAzuki() public {
         vm.prank(USER1);
         erc721a.transferFrom(USER1, USER2, 2);
@@ -99,6 +124,11 @@ contract CompareERC721Test is Test {
     function testSimpleTransferOZ() public {
         vm.prank(USER1);
         erc721oz.transferFrom(USER1, USER2, 1);
+    }
+
+    function testSimpleTransferSolady() public {
+        vm.prank(USER1);
+        erc721s.transferFrom(USER1, USER2, 1);
     }
 
     function testSimpleTransferAzuki() public {
@@ -115,6 +145,10 @@ contract CompareERC721Test is Test {
         erc721oz.burn(1);
     }
 
+    function testSimpleBurnSolady() public {
+        erc721s.burn(1);
+    }
+
     function testSimpleBurnAzuki() public {
         erc721a.burn(1);
     }
@@ -125,6 +159,10 @@ contract CompareERC721Test is Test {
 
     function testSimpleBurn1InOZ() public {
         erc721oz.burn(2);
+    }
+
+    function testSimpleBurn1InSolady() public {
+        erc721s.burn(2);
     }
 
     function testSimpleBurn1InAzuki() public {
@@ -140,6 +178,11 @@ contract CompareERC721Test is Test {
         erc721oz.safeTransferFrom(USER1, USER2, 1);
     }
 
+    function testSimpleSafeTransferToEoaSolady() public {
+        vm.prank(USER1);
+        erc721s.safeTransferFrom(USER1, USER2, 1);
+    }
+
     function testSimpleSafeTransferToEoaAzuki() public {
         vm.prank(USER1);
         erc721a.safeTransferFrom(USER1, USER2, 1);
@@ -153,6 +196,11 @@ contract CompareERC721Test is Test {
     function testSafeTransferToReceiverOZ() public {
         vm.prank(USER1);
         erc721oz.safeTransferFrom(USER1, receiver, 1, hex"010203");
+    }
+
+    function testSafeTransferToReceiverSolady() public {
+        vm.prank(USER1);
+        erc721s.safeTransferFrom(USER1, receiver, 1, hex"010203");
     }
 
     function testSafeTransferToReceiverAzuki() public {
