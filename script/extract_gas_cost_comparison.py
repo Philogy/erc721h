@@ -44,6 +44,8 @@ def main():
     lines = clean_str_arr(raw_gas_data.splitlines())[3:-1]
     tests = [[]]
     for row in lines:
+        if row.startswith("Running"):
+            continue
         if row == '':
             tests.append([])
         else:
@@ -61,6 +63,8 @@ def main():
         'Huff': [],
         'OZ': [],
         'OZ (delta)': [],
+        'Solady': [],
+        'Solady (delta)': [],
         'Azuki': [],
         'Azuki (delta)': []
     }
@@ -70,8 +74,9 @@ def main():
         for contract_type, gas in individual_tests:
             contract_types[contract_type].append(gas)
 
-    for huff, oz, azuki in zip(contract_types['Huff'], contract_types['OZ'], contract_types['Azuki']):
+    for huff, oz, solady, azuki in zip(contract_types['Huff'], contract_types['OZ'], contract_types['Solady'], contract_types['Azuki']):
         contract_types['OZ (delta)'].append(huff - oz)
+        contract_types['Solady (delta)'].append(huff - solady)
         contract_types['Azuki (delta)'].append(huff - azuki)
 
     for col, col_values in contract_types.items():

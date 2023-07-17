@@ -86,7 +86,7 @@ contract CompareERC721Test is Test {
         erc721oz.transferFrom(USER1, USER2, 20);
     }
 
-    function testSimpleTransfer20Solady() public {
+    function testSimpleTransfer20InSolady() public {
         vm.prank(USER1);
         erc721s.transferFrom(USER1, USER2, 20);
     }
